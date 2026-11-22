@@ -452,6 +452,7 @@ async function pullAll(){
   await pushState();
   render();
   if (!profile.notifSyncedAt || Date.now() - profile.notifSyncedAt > 6*3600e3) syncNotifs();
+  if (profile.dailyWall && profile.dailyWall.on && Date.now() - (profile.dailyWall.at||0) > 12*3600e3) setTimeout(()=>prepareDailyWalls(false), 4000);
 }
 async function initStore(){
   loadLocal(); migrate(); handleRoute(); render();
@@ -1295,6 +1296,7 @@ function viewMind(){
   const canUpload = true;
   return `
   ${posterHTML(quoteOfDay(),"pm")}
+  ${dailyWallHTML()}
   ${wallpaperHTML()}
   <section class="card">
     <div class="row between"><h2>Mon mur de motivation</h2><label class="btn sm red" for="photoIn" style="cursor:pointer">+ Photo</label></div>
@@ -1716,55 +1718,132 @@ function viewFlex(){
 /* ---------- Fond d'écran ---------- */
 const wall = {mode:"quote", bg:"art", fig:"none", qi:null, word:0, url:null, err:"", thumbs:{}};
 const WORDS = [["DISCIPLINE","Gagne la journée"],["AUCUNE EXCUSE","Personne ne viendra le faire à ta place"],["LA PESÉE NE MENT PAS","Chaque repas compte"],["PERSONNE NE VIENDRA","Lève-toi et va bosser"],["GAGNE LA JOURNÉE","Puis recommence demain"],["FAIM DE GAGNER","La faim passe, la ceinture reste"]];
-// Poses : coordonnées pour une silhouette de hauteur 1 (pieds en bas)
+// Poses : coordonnées pour une silhouette de hauteur 1 (pieds en bas). f = sens du regard (1 droite, 0 face)
 const POSES = {
-  garde:{nom:"En garde", head:[.53,.075,.052], neck:[.51,.14], sF:[.565,.19], sB:[.45,.2], hF:[.52,.5], hB:[.45,.51],
-    eF:[.635,.3], gF:[.665,.16], eB:[.5,.31], gB:[.575,.145], kF:[.62,.72], aF:[.675,.955], tF:[.745,.98], kB:[.41,.73], aB:[.33,.95], tB:[.37,.985]},
-  jab:{nom:"Jab", head:[.5,.085,.052], neck:[.49,.15], sF:[.55,.2], sB:[.43,.21], hF:[.5,.5], hB:[.43,.51],
-    eF:[.68,.2], gF:[.83,.18], eB:[.48,.31], gB:[.55,.155], kF:[.6,.72], aF:[.66,.955], tF:[.73,.98], kB:[.38,.73], aB:[.29,.95], tB:[.33,.985]},
-  kick:{nom:"High kick", head:[.3,.15,.05], neck:[.33,.215], sF:[.385,.245], sB:[.3,.27], hF:[.445,.5], hB:[.38,.53],
-    eF:[.43,.32], gF:[.395,.2], eB:[.22,.36], gB:[.15,.46], kF:[.62,.36], aF:[.85,.18], tF:[.93,.12], kB:[.38,.75], aB:[.37,.955], tB:[.45,.985]},
-  victoire:{nom:"Victoire", head:[.5,.11,.052], neck:[.5,.18], sF:[.6,.225], sB:[.4,.225], hF:[.555,.52], hB:[.445,.52],
-    eF:[.7,.13], gF:[.72,.02], eB:[.3,.13], gB:[.28,.02], kF:[.585,.75], aF:[.61,.955], tF:[.67,.985], kB:[.415,.75], aB:[.39,.955], tB:[.33,.985]}
+  garde:{nom:"En garde", f:1, head:[.535,.072], neck:[.515,.13], sF:[.575,.185], sB:[.445,.195], hF:[.525,.5], hB:[.45,.505],
+    eF:[.645,.3], gF:[.668,.155], eB:[.505,.315], gB:[.585,.14], kF:[.625,.72], aF:[.68,.955], tF:[.755,.982], kB:[.405,.73], aB:[.325,.948], tB:[.37,.985]},
+  jab:{nom:"Jab", f:1, head:[.505,.082], neck:[.495,.142], sF:[.56,.195], sB:[.43,.205], hF:[.505,.5], hB:[.435,.508],
+    eF:[.7,.195], gF:[.84,.175], eB:[.485,.315], gB:[.56,.15], kF:[.605,.72], aF:[.665,.955], tF:[.74,.982], kB:[.385,.73], aB:[.29,.948], tB:[.335,.985]},
+  kick:{nom:"High kick", f:1, head:[.3,.145], neck:[.33,.205], sF:[.39,.24], sB:[.295,.265], hF:[.45,.5], hB:[.385,.53],
+    eF:[.44,.32], gF:[.4,.195], eB:[.215,.355], gB:[.145,.455], kF:[.635,.36], aF:[.86,.18], tF:[.94,.125], kB:[.385,.75], aB:[.375,.955], tB:[.455,.985]},
+  victoire:{nom:"Victoire", f:0, head:[.5,.105], neck:[.5,.165], sF:[.615,.215], sB:[.385,.215], hF:[.56,.52], hB:[.44,.52],
+    eF:[.715,.125], gF:[.725,.015], eB:[.285,.125], gB:[.275,.015], kF:[.59,.75], aF:[.615,.955], tF:[.675,.985], kB:[.41,.75], aB:[.385,.955], tB:[.325,.985]},
+  champion:{nom:"Champion", f:0, belt:true, head:[.5,.13], neck:[.5,.19], sF:[.615,.24], sB:[.385,.24], hF:[.56,.535], hB:[.44,.535],
+    eF:[.7,.14], gF:[.64,.035], eB:[.3,.14], gB:[.36,.035], kF:[.59,.76], aF:[.615,.957], tF:[.675,.985], kB:[.41,.76], aB:[.385,.957], tB:[.325,.985]}
 };
 function drawFighter(g, pose, cx, top, h, opt={}){
-  const P = POSES[pose]; const pt = k => [cx + (P[k][0]-.5)*h, top + P[k][1]*h];
-  const circ = (p,r)=>{ g.beginPath(); g.arc(p[0],p[1],r,0,Math.PI*2); g.fill(); };
-  const cap = (A,B,ra,rb)=>{ // segment effilé : deux cercles reliés par leurs tangentes
-    const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
-    g.beginPath(); g.moveTo(A[0]+nx*ra,A[1]+ny*ra); g.lineTo(B[0]+nx*rb,B[1]+ny*rb); g.lineTo(B[0]-nx*rb,B[1]-ny*rb); g.lineTo(A[0]-nx*ra,A[1]-ny*ra); g.closePath(); g.fill();
-    circ(A,ra); circ(B,rb); };
+  const P = POSES[pose], W = 1170, H = 2532, u = h;
+  const pt = k => [cx + (P[k][0]-.5)*h, top + P[k][1]*h];
   const lerp = (A,B,t)=>[A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t];
-  const limb = (A,B,ra,rm,rb)=>{ const M = lerp(A,B,.38); cap(A,M,ra,rm); cap(M,B,rm,rb); };
-  const u = h;
-  const leg = (hp,k,a,t)=>{ limb(pt(hp),pt(k),.058*u,.056*u,.04*u); limb(pt(k),pt(a),.04*u,.038*u,.024*u); cap(pt(a),pt(t),.024*u,.016*u); };
-  const arm = (s,e,gl)=>{ limb(pt(s),pt(e),.036*u,.034*u,.027*u); cap(pt(e),pt(gl),.027*u,.03*u); };
-  const torso = ()=>{ const a=pt("sF"), b=pt("sB"), c=pt("hB"), d=pt("hF"), n=pt("neck");
-    const wa = lerp(lerp(a,d,.62), lerp(b,c,.62), .5);
-    g.beginPath(); g.moveTo(a[0],a[1]); g.quadraticCurveTo(n[0], n[1]-.01*u, b[0], b[1]);
-    g.quadraticCurveTo(b[0]-.02*u, (b[1]+c[1])/2, c[0], c[1]); g.lineTo(d[0], d[1]);
-    g.quadraticCurveTo(a[0]+.03*u, (a[1]+d[1])/2, a[0], a[1]); g.closePath(); g.fill();
-    circ(a,.042*u); circ(b,.042*u); cap(n, pt("head").slice(0,2), .026*u, .03*u); void wa; };
-  const head = ()=>{ const H = pt("head"); g.beginPath(); g.ellipse(H[0],H[1],P.head[2]*u*.9,P.head[2]*u*1.08,0,0,Math.PI*2); g.fill(); };
-  const shorts = (col)=>{ const a=pt("hB"), b=pt("hF"), k1=lerp(pt("hF"),pt("kF"),.42), k2=lerp(pt("hB"),pt("kB"),.42);
-    g.save(); g.fillStyle = col; g.beginPath(); g.moveTo(a[0]-.012*u,a[1]-.035*u); g.lineTo(b[0]+.012*u,b[1]-.035*u);
-    g.lineTo(k1[0]+.05*u,k1[1]); g.lineTo(k1[0]-.05*u,k1[1]+.01*u); g.lineTo((a[0]+b[0])/2,(a[1]+b[1])/2+.06*u); g.lineTo(k2[0]+.05*u,k2[1]+.01*u); g.lineTo(k2[0]-.05*u,k2[1]); g.closePath(); g.fill();
-    g.fillStyle = "rgba(239,231,220,.55)"; g.fillRect(Math.min(a[0],b[0])-.012*u, Math.min(a[1],b[1])-.04*u, Math.abs(b[0]-a[0])+.024*u, .012*u); g.restore(); };
-  const gloves = (col)=>{ g.save(); g.fillStyle = col; ["gB","gF"].forEach(k=>{ const q = pt(k); g.beginPath(); g.ellipse(q[0],q[1],.046*u,.05*u,0,0,Math.PI*2); g.fill(); }); g.restore(); };
-  const body = (back)=>{ leg("hB","kB","aB","tB"); arm("sB","eB","gB"); torso(); head(); leg("hF","kF","aF","tF"); arm("sF","eF","gF"); };
-  g.save();
-  // halo de projecteur derrière la silhouette
-  g.shadowColor = opt.glow || "rgba(215,38,46,.95)"; g.shadowBlur = .07*u; g.fillStyle = "#3b0d10"; body();
-  g.shadowBlur = 0;
-  // liseré de lumière (rim light) venant du haut
-  g.fillStyle = opt.rim || "rgba(239,231,220,.5)"; g.save(); g.translate(0,-.006*u); body(); g.restore();
-  g.fillStyle = "#0a0808"; body();
-  shorts(opt.shorts || "#5c1216"); gloves(opt.gloves || "#7d171c");
-  // reflets sur les gants
-  g.fillStyle = "rgba(255,255,255,.18)"; ["gB","gF"].forEach(k=>{ const q = pt(k); g.beginPath(); g.ellipse(q[0]-.012*u,q[1]-.016*u,.016*u,.011*u,-.6,0,Math.PI*2); g.fill(); });
-  g.restore();
-  const fl = g.createRadialGradient(cx, top+h, 4, cx, top+h, h*.5); fl.addColorStop(0,"rgba(215,38,46,.4)"); fl.addColorStop(1,"rgba(215,38,46,0)");
-  g.save(); g.translate(cx, top+h); g.scale(1,.1); g.fillStyle = fl; g.beginPath(); g.arc(0,0,h*.5,0,Math.PI*2); g.fill(); g.restore();
+  const mk = () => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c; };
+  // Segment musclé : contour en courbes avec un renflement de chaque côté
+  function muscle(x, A, B, ra, rb, bulgeA, bulgeB, tA=.4, tB=.4){
+    const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+    const ca = lerp(A,B,tA), cb = lerp(A,B,tB);
+    x.beginPath(); x.moveTo(A[0]+nx*ra, A[1]+ny*ra);
+    x.quadraticCurveTo(ca[0]+nx*bulgeA, ca[1]+ny*bulgeA, B[0]+nx*rb, B[1]+ny*rb);
+    x.lineTo(B[0]-nx*rb, B[1]-ny*rb);
+    x.quadraticCurveTo(cb[0]-nx*bulgeB, cb[1]-ny*bulgeB, A[0]-nx*ra, A[1]-ny*ra);
+    x.closePath(); x.fill();
+    x.beginPath(); x.arc(A[0],A[1],ra,0,7); x.fill(); x.beginPath(); x.arc(B[0],B[1],rb,0,7); x.fill();
+  }
+  function leg(x, hp, k, a, t, front){
+    const H0 = pt(hp), K = pt(k), A = pt(a), T = pt(t);
+    muscle(x, H0, K, .066*u, .043*u, .082*u, .074*u, .38, .45);      // cuisse : quadriceps et ischios
+    muscle(x, K, A, .041*u, .022*u, .044*u, .056*u, .55, .32);       // mollet bombé derrière
+    const ang = Math.atan2(T[1]-A[1], T[0]-A[0]), Lf = Math.hypot(T[0]-A[0], T[1]-A[1]);   // pied, dans son propre repère
+    x.save(); x.translate(A[0], A[1]); x.rotate(ang); if (T[0] < A[0]) x.scale(1,-1);
+    x.beginPath(); x.moveTo(-.02*u, -.02*u); x.quadraticCurveTo(Lf*.45, -.026*u, Lf+.006*u, -.004*u);
+    x.quadraticCurveTo(Lf+.01*u, .01*u, Lf-.004*u, .014*u); x.lineTo(-.028*u, .02*u); x.quadraticCurveTo(-.04*u, 0, -.02*u, -.02*u); x.closePath(); x.fill();
+    x.restore();
+    void front;
+  }
+  function arm(x, s, e, gl){
+    const S = pt(s), E = pt(e), G = pt(gl);
+    x.beginPath(); x.arc(S[0], S[1], .052*u, 0, 7); x.fill();                 // deltoïde
+    muscle(x, S, E, .045*u, .031*u, .054*u, .046*u, .42, .38);                  // biceps / triceps
+    muscle(x, E, G, .032*u, .028*u, .041*u, .036*u, .3, .3);                    // avant-bras
+  }
+  function torso(x){
+    const a = pt("sF"), b = pt("sB"), c = pt("hB"), d = pt("hF"), n = pt("neck");
+    const wF = lerp(a, d, .66), wB = lerp(b, c, .66);               // taille
+    const mid = lerp(lerp(a,b,.5), lerp(d,c,.5), .5);
+    const inF = [wF[0] + (mid[0]-wF[0])*.12, wF[1]], inB = [wB[0] + (mid[0]-wB[0])*.12, wB[1]];
+    x.beginPath();
+    x.moveTo(n[0], n[1]-.012*u);
+    x.quadraticCurveTo(a[0]-.01*u, a[1]-.045*u, a[0]+.012*u, a[1]);          // trapèze
+    x.quadraticCurveTo(a[0]+.035*u, (a[1]+inF[1])*.45, inF[0], inF[1]);       // pectoral / grand dorsal (V)
+    x.quadraticCurveTo(d[0]+.012*u, (inF[1]+d[1])/2, d[0]+.01*u, d[1]);
+    x.lineTo(c[0]-.01*u, c[1]);
+    x.quadraticCurveTo(c[0]-.012*u, (inB[1]+c[1])/2, inB[0], inB[1]);
+    x.quadraticCurveTo(b[0]-.035*u, (b[1]+inB[1])*.45, b[0]-.012*u, b[1]);
+    x.quadraticCurveTo(b[0]+.01*u, b[1]-.045*u, n[0], n[1]-.012*u);
+    x.closePath(); x.fill();
+  }
+  function head(x){
+    const Hd = pt("head"), N = pt("neck");
+    muscle(x, N, Hd, .034*u, .03*u, .036*u, .036*u);                         // cou épais
+    x.beginPath(); x.ellipse(Hd[0], Hd[1]-.004*u, .043*u, .052*u, 0, 0, 7); x.fill();
+    if (P.f){ x.beginPath(); x.moveTo(Hd[0]+.02*u, Hd[1]+.01*u); x.quadraticCurveTo(Hd[0]+.05*u, Hd[1]+.02*u, Hd[0]+.035*u, Hd[1]+.045*u); x.lineTo(Hd[0]-.01*u, Hd[1]+.05*u); x.closePath(); x.fill(); }
+    else { x.beginPath(); x.moveTo(Hd[0]-.035*u, Hd[1]+.01*u); x.quadraticCurveTo(Hd[0], Hd[1]+.075*u, Hd[0]+.035*u, Hd[1]+.01*u); x.closePath(); x.fill(); }
+  }
+  function body(x){ leg(x,"hB","kB","aB","tB",false); arm(x,"sB","eB","gB"); torso(x); head(x); leg(x,"hF","kF","aF","tF",true); arm(x,"sF","eF","gF"); }
+  function glove(x, k, e){
+    const G = pt(k), E = pt(e), ang = Math.atan2(G[1]-E[1], G[0]-E[0]);
+    x.save(); x.translate(G[0], G[1]); x.rotate(ang);
+    x.beginPath(); x.ellipse(.01*u, 0, .056*u, .048*u, 0, 0, 7); x.fill();                       // poing
+    x.beginPath(); x.ellipse(-.005*u, .036*u, .026*u, .018*u, .5, 0, 7); x.fill();                 // pouce
+    x.beginPath(); x.rect(-.06*u, -.034*u, .04*u, .068*u); x.fill();                               // manchette
+    x.restore();
+  }
+  function shortsShape(x){
+    const a=pt("hB"), b=pt("hF"), k1=lerp(pt("hF"),pt("kF"),.45), k2=lerp(pt("hB"),pt("kB"),.45), mid=lerp(a,b,.5);
+    x.beginPath(); x.moveTo(a[0]-.03*u, a[1]-.04*u); x.lineTo(b[0]+.03*u, b[1]-.04*u);
+    x.quadraticCurveTo(k1[0]+.08*u, (b[1]+k1[1])/2, k1[0]+.065*u, k1[1]); x.lineTo(k1[0]-.06*u, k1[1]+.012*u);
+    x.lineTo(mid[0], mid[1]+.075*u); x.lineTo(k2[0]+.06*u, k2[1]+.012*u); x.lineTo(k2[0]-.065*u, k2[1]);
+    x.quadraticCurveTo(k2[0]-.08*u, (a[1]+k2[1])/2, a[0]-.03*u, a[1]-.04*u); x.closePath(); x.fill();
+  }
+  // 1. masque de la silhouette complète
+  const M = mk(), m = M.getContext("2d"); m.fillStyle = "#000"; body(m); glove(m,"gB","eB"); glove(m,"gF","eF"); shortsShape(m);
+  if (P.belt){ const L = pt("gB"), R = pt("gF"); m.fillRect(L[0]-.02*u, L[1]-.035*u, R[0]-L[0]+.04*u, .07*u); }
+  // 2. halo coloré derrière
+  g.save(); g.shadowColor = opt.glow || "rgba(215,38,46,.9)"; g.shadowBlur = .09*u; g.drawImage(M,0,0,W,H); g.drawImage(M,0,0,W,H); g.restore();
+  // 3. corps : peau sombre avec léger dégradé
+  const B = mk(), bx = B.getContext("2d"); bx.drawImage(M,0,0);
+  bx.globalCompositeOperation = "source-in";
+  const sk = bx.createLinearGradient(cx-h*.3, top, cx+h*.3, top+h); sk.addColorStop(0,"#2a1d1a"); sk.addColorStop(.5,"#120d0c"); sk.addColorStop(1,"#070505"); bx.fillStyle = sk; bx.fillRect(0,0,W,H);
+  // 4. couleurs : short, gants, ceinture
+  bx.globalCompositeOperation = "source-atop";
+  const red = opt.gloves || "#a3191f";
+  bx.fillStyle = opt.shorts || "#6d1418"; shortsShape(bx);
+  bx.fillStyle = "rgba(239,231,220,.8)"; const ha = pt("hB"), hb = pt("hF"); bx.fillRect(Math.min(ha[0],hb[0])-.03*u, Math.min(ha[1],hb[1])-.045*u, Math.abs(hb[0]-ha[0])+.06*u, .014*u);
+  bx.fillStyle = red; glove(bx,"gB","eB"); glove(bx,"gF","eF");
+  if (P.belt){ const L = pt("gB"), R = pt("gF"); const bg = bx.createLinearGradient(L[0],L[1],R[0],R[1]); bg.addColorStop(0,"#7a5416"); bg.addColorStop(.5,"#f3d27a"); bg.addColorStop(1,"#7a5416");
+    bx.fillStyle = "#151010"; bx.fillRect(L[0]-.02*u, L[1]-.03*u, R[0]-L[0]+.04*u, .06*u); bx.fillStyle = bg; bx.beginPath(); bx.ellipse((L[0]+R[0])/2, L[1], .07*u, .05*u, 0, 0, 7); bx.fill(); }
+  // 5. définition musculaire (très discrète)
+  bx.strokeStyle = "rgba(239,231,220,.07)"; bx.lineWidth = .004*u; bx.lineCap = "round";
+  const a = pt("sF"), b2 = pt("sB"), d = pt("hF"), c = pt("hB"), mid = lerp(lerp(a,b2,.5), lerp(d,c,.5), .5);
+  const pec = lerp(lerp(a,b2,.5), mid, .45);
+  bx.beginPath(); bx.moveTo(lerp(a,b2,.15)[0], pec[1]); bx.quadraticCurveTo(pec[0], pec[1]+.03*u, lerp(a,b2,.85)[0], pec[1]); bx.stroke();
+  bx.beginPath(); bx.moveTo(pec[0], pec[1]+.02*u); bx.lineTo(mid[0], mid[1]+.09*u); bx.stroke();
+  for (let i=1;i<=3;i++){ const y = pec[1]+.02*u + i*.045*u; bx.beginPath(); bx.moveTo(mid[0]-.035*u, y); bx.lineTo(mid[0]+.035*u, y); bx.stroke(); }
+  // 6. liserés de lumière : blanc chaud venant du haut, rouge venant du côté
+  function rim(dx, dy, col, blur){
+    const R = mk(), r = R.getContext("2d"); r.drawImage(M,0,0); r.globalCompositeOperation = "destination-out"; r.drawImage(M, dx, dy);
+    r.globalCompositeOperation = "source-in"; r.fillStyle = col; r.fillRect(0,0,W,H);
+    bx.globalCompositeOperation = "source-atop"; bx.save(); bx.filter = `blur(${blur}px)`; bx.drawImage(R,0,0); bx.restore();
+  }
+  rim(-.006*u, .012*u, opt.rim || "rgba(255,236,214,.85)", 2);
+  rim(.012*u, .002*u, opt.rim2 || "rgba(230,40,48,.75)", 3);
+  // reflets gants
+  bx.globalCompositeOperation = "source-atop"; bx.fillStyle = "rgba(255,255,255,.22)";
+  ["gB","gF"].forEach(k=>{ const q = pt(k); bx.beginPath(); bx.ellipse(q[0]-.012*u, q[1]-.018*u, .02*u, .012*u, -.6, 0, 7); bx.fill(); });
+  g.drawImage(B,0,0,W,H);
+  // 7. sol et poussière dans la lumière
+  const fl = g.createRadialGradient(cx, top+h, 4, cx, top+h, h*.55); fl.addColorStop(0,"rgba(215,38,46,.45)"); fl.addColorStop(1,"rgba(215,38,46,0)");
+  g.save(); g.translate(cx, top+h); g.scale(1,.1); g.fillStyle = fl; g.beginPath(); g.arc(0,0,h*.55,0,7); g.fill(); g.restore();
+  g.save(); g.fillStyle = "rgba(0,0,0,.55)"; g.beginPath(); g.ellipse(cx, top+h*.99, h*.22, h*.018, 0, 0, 7); g.fill(); g.restore();
+  const r = rnd(Math.round(cx+top)); for (let i=0;i<140;i++){ const x = cx + (r()-.5)*W*.9, y = top + r()*h*.9, s = r()*3+1; g.fillStyle = `rgba(255,236,214,${r()*.35})`; g.beginPath(); g.arc(x,y,s,0,7); g.fill(); }
 }
 const DISP = "Anton, Impact, sans-serif", BODY = "'Barlow Semi Condensed', 'Arial Narrow', sans-serif";
 function rnd(seed){ let s = (seed*9301+49297)%233280; return ()=> (s = (s*9301+49297)%233280)/233280; }
@@ -1822,7 +1901,7 @@ function bgBelt(g,W,H,seed){
   g.fillStyle="#f3d27a"; g.font=`170px ${DISP}`; g.textAlign="center"; g.textBaseline="middle"; g.fillText("FC", cx, cy+28); g.textAlign="left"; g.textBaseline="alphabetic";
 }
 const BGS = [["art","Octogone"],["ring","Ring"],["smoke","Fumée"],["poster","Affiche"],["belt","Ceinture"],["minimal","Minimal"]];
-const FIGS = [["none","Aucun"],["garde","En garde"],["jab","Jab"],["kick","High kick"],["victoire","Victoire"]];
+const FIGS = [["none","Aucun"],["garde","En garde"],["jab","Jab"],["kick","High kick"],["victoire","Victoire"],["champion","Champion"]];
 const MODES = [["quote","Citation"],["word","Mot fort"],["goal","Objectif"],["count","Compte à rebours"],["tape","Fiche du combattant"]];
 function fitLines(g, text, maxW, maxLines, size, min, fam){
   let lines; do { g.font = `${size}px ${fam}`; lines = wrapLines(g, text, maxW); if (lines.length <= maxLines && lines.every(l=>g.measureText(l).width<=maxW)) break; size -= 4; } while (size > min);
@@ -1840,7 +1919,7 @@ async function makeWallpaper(o, scale=1){
   try{ await document.fonts.load("100px Anton"); await document.fonts.load("700 40px 'Barlow Semi Condensed'"); }catch(e){}
   const seed = o.seed ?? Math.floor(Date.now()/864e5), fig = POSES[o.fig] ? o.fig : null, light = o.bg==="poster";
   if (o.bg==="photo" && profile.photos.length){
-    const photo = profile.photos[(Math.floor(Date.now()/864e5)+quoteOffset) % profile.photos.length];
+    const photo = profile.photos[o.photoIdx!==undefined ? o.photoIdx % profile.photos.length : (Math.floor(Date.now()/864e5)+quoteOffset) % profile.photos.length];
     const img = await new Promise((res,rej)=>{ const im = new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=rej; im.src = photo.url; }).catch(()=>null);
     if (img){ const s = Math.max(SW/img.width, SH/img.height); g.filter="grayscale(55%) contrast(1.1) brightness(.6)"; g.drawImage(img,(SW-img.width*s)/2,(SH-img.height*s)/2,img.width*s,img.height*s); g.filter="none"; } else bgOctagon(g,SW,SH,seed,!!fig);
   } else ({ring:bgRing, smoke:bgSmoke, poster:bgPoster, belt:bgBelt, minimal:bgMinimal}[o.bg] || ((g,W,H,s)=>bgOctagon(g,W,H,s,!!fig)))(g,SW,SH,seed);
@@ -1890,7 +1969,7 @@ async function makeWallpaper(o, scale=1){
       g.font = `700 ${fig?40:48}px ${BODY}`; g.fillStyle = mute; g.fillText(k.toUpperCase(), L, yy);
       g.font = `${fig?62:84}px ${DISP}`; g.fillStyle = i===2 ? sub : ink; const w = g.measureText(v).width; g.fillText(v, SW-L-w, yy); });
   }
-  try{ return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(),"image/png")); } catch(e){ return null; }
+  try{ return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(), o.jpeg ? "image/jpeg" : "image/png", .9)); } catch(e){ return null; }
 }
 const qIdx = a => Math.max(0, allQuotes().findIndex(q=>q[1]===a));
 const PRESETS = () => [
@@ -1926,6 +2005,80 @@ async function buildThumbs(){
   }
   wall.thumbsBusy = false;
 }
+/* --- Fond d'écran automatique : un nouveau chaque jour via Raccourcis --- */
+const dayNum = dk => Math.floor(parseKey(dk).getTime()/864e5);
+function quoteForDate(dk){ const qs = allQuotes(); return qs[((dayNum(dk) % qs.length) + qs.length) % qs.length]; }
+function dailyTemplate(dk){
+  const n = dayNum(dk), hasPh = profile.photos.length > 0, qi = allQuotes().indexOf(quoteForDate(dk));
+  if (hasPh && n % 2 === 0) return {mode:"quote", bg:"photo", fig:"none", qi, photoIdx: Math.floor(n/2) % profile.photos.length, seed:n};
+  const T = [
+    {mode:"quote", bg:"smoke", fig:"victoire"}, {mode:"quote", bg:"art", fig:"garde"}, {mode:"quote", bg:"ring", fig:"jab"},
+    {mode:"quote", bg:"smoke", fig:"kick"}, {mode:"word", bg:"belt", fig:"none"}, {mode:"quote", bg:"art", fig:"champion"},
+    {mode:"goal", bg:"smoke", fig:"garde"}, {mode:"quote", bg:"ring", fig:"none"}, {mode:"count", bg:"art", fig:"none"},
+    {mode:"quote", bg:"poster", fig:"victoire"}, {mode:"tape", bg:"poster", fig:"none"}, {mode:"quote", bg:"minimal", fig:"none"}
+  ];
+  return Object.assign({qi, word: n % WORDS.length, seed: n}, T[(hasPh ? Math.floor(n/2) : n) % T.length]);
+}
+const dw = {busy:false, msg:"", token:null, url:null};
+const WALL_FN = SUPA_URL + "/functions/v1/wall-today?t=";
+async function wallToken(){
+  if (dw.token) return dw.token;
+  const {data} = await sb.from("wall_tokens").select("token").maybeSingle();
+  if (data && data.token){ dw.token = data.token; return dw.token; }
+  const t = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b=>b.toString(16).padStart(2,"0")).join("");
+  const {error} = await sb.from("wall_tokens").insert({token:t}); if (error) throw error;
+  dw.token = t; return t;
+}
+async function prepareDailyWalls(force){
+  if (!store.uid || dw.busy || !navigator.onLine) return;
+  dw.busy = true; dw.msg = "Préparation de tes fonds d'écran…"; paintDW();
+  try{
+    await wallToken();
+    const bucket = sb.storage.from("walls");
+    const {data: list} = await bucket.list(store.uid, {limit: 200});
+    const have = new Set((list||[]).map(f=>f.name));
+    const today = dkey(), keep = dkey(addDays(new Date(), -3));
+    const old = (list||[]).map(f=>f.name).filter(n => n.slice(0,10) < keep).map(n => store.uid + "/" + n);
+    if (old.length) await bucket.remove(old);
+    let made = 0;
+    for (let i=0;i<14;i++){
+      const dk = dkey(addDays(new Date(), i));
+      if (have.has(dk+".jpg") && !force) continue;
+      dw.msg = `Fond d'écran ${i+1}/14…`; paintDW();
+      const blob = await makeWallpaper(Object.assign({jpeg:true}, dailyTemplate(dk)));
+      if (!blob) continue;
+      const {error} = await bucket.upload(`${store.uid}/${dk}.jpg`, blob, {contentType:"image/jpeg", upsert:true});
+      if (error) throw error; made++;
+    }
+    profile.dailyWall = {on:true, at: Date.now()}; saveProfile();
+    dw.msg = made ? `${made} fond(s) préparé(s). Les 14 prochains jours sont prêts.` : "Les 14 prochains jours sont prêts.";
+  }catch(e){ dw.msg = "Préparation impossible. Vérifie ta connexion et réessaie."; }
+  dw.busy = false; paintDW(); void today;
+}
+function paintDW(){ const el = document.getElementById("dwStat"); if (el) el.innerHTML = dw.busy ? `<div class="ai"><span class="dot"></span><span>${esc(dw.msg)}</span></div>` : (dw.msg ? `<div class="small" style="color:var(--ok)">${esc(dw.msg)}</div>` : ""); }
+function dailyWallHTML(){
+  const on = profile.dailyWall && profile.dailyWall.on;
+  const link = dw.token ? WALL_FN + dw.token : "";
+  if (on && !dw.token && store.uid) wallToken().then(()=>{ if (tab==="mind") render(); }).catch(()=>{});
+  return `<section class="card ${on?"":"hi"}" id="dailyWall">
+    <span class="kicker">Nouveau chaque jour</span>
+    <h2>Fond d'écran automatique</h2>
+    <p class="small muted" style="margin:0">Chaque matin, ton iPhone change tout seul de fond d'écran : une citation différente chaque jour, en alternant combattants, ceinture, ring et tes propres photos${profile.photos.length?` (${profile.photos.length} dans ton mur)`:""}. Fight Camp prépare 14 jours d'avance et complète quand tu ouvres l'app.</p>
+    <button class="btn ${on?"":"red"}" data-act="dwPrepare" ${dw.busy?"disabled":""}>${on?"Régénérer mes 14 prochains fonds":"Activer le fond d'écran automatique"}</button>
+    <div id="dwStat"></div>
+    ${on && link ? `
+      <h3>Une seule fois sur ton iPhone (app Raccourcis)</h3>
+      <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px">
+        <li>Copie ton lien personnel : <button class="btn sm" data-act="dwCopy">Copier le lien</button></li>
+        <li>Raccourcis › <b>Automatisation</b> › <b>+</b> › <b>Heure de la journée</b> › 5:00, Quotidien › <b>Exécuter immédiatement</b> › Suivant.</li>
+        <li>Ajoute l'action <b>« Obtenir le contenu de l'URL »</b> et colle le lien.</li>
+        <li>Ajoute l'action <b>« Définir le fond d'écran »</b> (choisis ton fond d'écran Fight Camp, écran verrouillé). Touche la flèche de l'action et désactive « Afficher l'aperçu ».</li>
+        <li>Pour vérifier tout de suite, touche ▶︎ en bas de l'automatisation.</li>
+      </ol>
+      <p class="small muted" style="margin:0">Garde ce lien pour toi : il donne accès à tes fonds d'écran. La première fois, iOS te demande de choisir un fond d'écran existant : crée-en un avec n'importe quelle image Fight Camp ci-dessus.</p>` : ""}
+  </section>`;
+}
+
 async function refreshWallpaper(){
   wall.err = ""; const b = await makeWallpaper(wall);
   if (!b){ wall.err = "Cette photo ne peut pas servir de fond. Choisis un autre fond."; if (tab==="mind") render(); return; }
@@ -2247,6 +2400,8 @@ document.addEventListener("click", async e=>{
     case "wallMode": wall.mode = b.dataset.v; render(); refreshWallpaper(); break;
     case "wallNextQ": { const n = allQuotes().length; wall.qi = ((wall.qi===null ? allQuotes().indexOf(quoteOfDay()) : wall.qi) + 1) % n; render(); refreshWallpaper(); break; }
     case "wallPreset": { const p = PRESETS().find(x=>x.id===b.dataset.id); if (!p) return; Object.assign(wall, {mode:"quote", fig:"none", word:0, qi:null}, p.o); render(); refreshWallpaper(); document.getElementById("wpImg")?.scrollIntoView({behavior:"smooth", block:"center"}); break; }
+    case "dwPrepare": prepareDailyWalls(true); break;
+    case "dwCopy": { const t = await wallToken().catch(()=>null); if (!t) return; try{ await navigator.clipboard.writeText(WALL_FN + t); toast("Lien copié"); }catch(err){ toast("Copie refusée"); } break; }
     case "wallFig": wall.fig = b.dataset.v; render(); refreshWallpaper(); break;
     case "wallNextW": wall.word = ((wall.word||0) + 1) % WORDS.length; render(); refreshWallpaper(); break;
     case "wallBg": wall.bg = b.dataset.v; render(); refreshWallpaper(); break;
@@ -2332,6 +2487,7 @@ document.addEventListener("change", async e=>{
       }catch(err){ toast("Photo refusée : essaie un JPG ou PNG plus léger"); }
     }
     saveProfile(); render(); toast("Photo ajoutée");
+    if (profile.dailyWall && profile.dailyWall.on) setTimeout(()=>prepareDailyWalls(true), 1500);
   }
 });
 document.addEventListener("submit", e=>{
