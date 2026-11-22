@@ -217,6 +217,21 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .thumb{flex:none;width:92px;background:none;border:0;padding:0;color:var(--bone);font-family:var(--body);font-size:12px;font-weight:600;display:flex;flex-direction:column;gap:5px;align-items:center;cursor:pointer;scroll-snap-align:start}
 .thumb img{width:92px;aspect-ratio:1170/2532;border-radius:10px;border:2px solid var(--line);background:#1b1717;object-fit:cover;display:block}
 .thumb:focus-visible img,.thumb:hover img{border-color:var(--red)}
+.agenda{display:flex;flex-direction:column}
+.agday{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.agday:last-child{border-bottom:0}
+.agd{display:flex;flex-direction:column;align-items:center;line-height:1.05}
+.agd b{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.06em}
+.agd span{font-family:var(--display);font-size:24px}
+.agday.today .agd span{color:var(--red)}
+.agl{display:flex;flex-direction:column;gap:6px;min-width:0}
+.agi{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-radius:4px;background:#1f1c1b;border-left:3px solid var(--red)}
+.agi.k-flex{border-left-color:var(--gold)} .agi.k-cardio{border-left-color:#3d8fb8} .agi.k-combat{border-left-color:var(--bone)} .agi.k-autre{border-left-color:var(--muted)}
+.agt{font-weight:700}
+.nextp{border-left:3px solid var(--gold);padding-left:10px}
+.tapper{background:#1b1717;border:2px solid var(--line);border-radius:50%;width:min(70vw,280px);aspect-ratio:1;align-self:center;color:var(--bone);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation}
+.tapper:active{transform:scale(.97);border-color:var(--red)}
+.tapper.done{border-color:var(--gold)}
 .big-day{font-family:var(--display);font-size:56px;line-height:.9;color:var(--red)}
 .hidden{display:none!important}
 @media (max-width:380px){.grid3{grid-template-columns:1fr 1fr}}
@@ -404,10 +419,12 @@ async function pullAll(){
   if (!data.length && lsGet("fc:profile")){ saveProfile(); Object.keys(days).forEach(k=>saveDay(k)); }
   await flushDirty();
   await refreshPhotoUrls();
+  await pushState();
   render();
+  if (!profile.notifSyncedAt || Date.now() - profile.notifSyncedAt > 6*3600e3) syncNotifs();
 }
 async function initStore(){
-  loadLocal(); migrate(); render();
+  loadLocal(); migrate(); handleRoute(); render();
   const {data:{session}} = await sb.auth.getSession();
   sb.auth.onAuthStateChange((ev, s)=>{
     store.session = s;
@@ -536,7 +553,7 @@ const sampleCaps = { images:{maxCount:6}, tools:{maxCount:4} };
 async function initSample(){}
 const downloadsCap = {
   async save({filename, data}){
-    const file = new File([data], filename, {type:"image/png"});
+    const file = new File([data], filename, {type: filename.endsWith(".ics") ? "text/calendar" : "image/png"});
     if (navigator.canShare && navigator.canShare({files:[file]})){
       try{ await navigator.share({files:[file]}); return; }catch(e){ if (e && e.name==="AbortError") throw {code:"declined"}; }
     }
@@ -658,10 +675,17 @@ function viewToday(){
   ${posterHTML(quoteOfDay(),"pc")}
   <section class="card ${ts?"hi":""}">
     <div class="row between"><h2>Séance du jour</h2><button class="btn sm" data-act="goProg">${profile.program?"Ouvrir":"Importer"}</button></div>
+    ${(()=>{ const n = nextPlanned(); if (!n) return `<button class="btn sm ghost" data-act="goPlan" style="align-self:flex-start">Programmer mes séances</button>`;
+      const dd = parseKey(n.d), today = n.d===dkey();
+      return `<div class="nextp"><span class="kicker" style="color:var(--gold)">${today?"Aujourd'hui":dd.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric"})} · ${n.p.time}</span><div style="font-family:var(--display);font-size:20px;text-transform:uppercase">${esc(planTitle(n.p))}</div></div>`; })()}
     ${ts ? `<div><div style="font-family:var(--display);font-size:22px;text-transform:uppercase">${esc(ts.s.nom)}</div><div class="small muted">${esc(ts.s.focus||"")} · ${ts.s.exercices.length} exercices</div></div>`
          : profile.program ? `<p class="small muted" style="margin:0">Pas de séance prévue aujourd'hui dans ton programme. Jour de repos : profites-en pour une séance de souplesse.</p>`
          : `<p class="small muted" style="margin:0">Importe le programme de ton coach (PDF ou photo) pour l'avoir ici chaque jour, avec des conseils de charge.</p>`}
   </section>
+  ${(()=>{ const c = notifCfg(); if (!c.defis) return ""; const slots = defiSlots(dkey()), done = (day().defis||[]);
+    return `<section class="card"><div class="row between"><h2>Défis du jour</h2><span class="num" style="font-size:24px;color:var(--gold)">${done.length}<small>/ ${slots.length}</small></span></div>
+    <p class="small muted" style="margin:0">${slots.map((s,j)=>{ const ok = done.some(x=>x.key===dkey()+"_"+j); return `${ok?"✓":"○"} ${s.time} · ${s.ex[1]}${s.ex[2]==="s"?" s":""} ${s.ex[0]}`; }).join("<br>")}</p>
+    <button class="btn sm" data-act="defiNow" style="align-self:flex-start">Faire un défi maintenant</button></section>`; })()}
   <section class="card">
     <div class="row between"><h2>Checklist du jour</h2><span class="muted">${done}/${profile.habits.length}</span></div>
     <div>${profile.habits.map(h=>`
@@ -1173,9 +1197,23 @@ function viewSetup(){
       <p class="small muted" style="margin:0">${matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "Fight Camp est installée sur ton écran d'accueil." : "Sur iPhone, ouvre cette page dans Safari › bouton Partager › « Sur l'écran d'accueil ». Sur Android, menu ⋮ de Chrome › « Installer l'application »."}</p>
     </div>
   </section>
+  ${pushCardHTML()}
   <section class="card">
-    <h2>Rappels</h2>
-    <p class="small muted" style="margin:0">Tes notifications sont dans l'app Rappels de ton téléphone : pesée 7 h 30, photo du déjeuner 12 h 30, eau 16 h, souplesse 20 h 30, checklist 21 h 45. Touche un rappel pour ouvrir Fight Camp. Pour changer une heure, modifie-la dans Rappels ou demande-le moi dans la conversation.</p>
+    <h2>Rappels quotidiens</h2>
+    <p class="small muted" style="margin:0">Laisse une heure vide pour couper un rappel.</p>
+    <div class="grid2">${[["pesee","Pesée"],["eau","Eau"],["souplesse","Souplesse"],["checklist","Checklist"]].map(([k,l])=>`<label class="f" for="n_${k}">${l}<input id="n_${k}" type="time" data-nf="${k}" value="${notifCfg()[k]||""}"></label>`).join("")}</div>
+    <h3>Défis surprise</h3>
+    <label class="row small" for="n_defis" style="gap:8px"><input type="checkbox" id="n_defis" data-nf="defis" ${notifCfg().defis?"checked":""} style="width:auto"> Envoyer des défis (pompes, gainage, squats…) au hasard dans la journée</label>
+    <div class="grid3">
+      <label class="f" for="n_defisN">Par jour<select id="n_defisN" data-nf="defisN">${[1,2,3,4,5,6].map(n=>`<option ${+notifCfg().defisN===n?"selected":""}>${n}</option>`).join("")}</select></label>
+      <label class="f" for="n_from">De<input id="n_from" type="time" data-nf="defisFrom" value="${notifCfg().defisFrom}"></label>
+      <label class="f" for="n_to">À<input id="n_to" type="time" data-nf="defisTo" value="${notifCfg().defisTo}"></label>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Défi avant les réseaux</h2>
+    <p class="small muted" style="margin:0">Aucune app ne peut bloquer le déverrouillage d'un iPhone. Mais tu peux faire apparaître un défi chaque fois que tu ouvres Instagram ou TikTok : app Raccourcis › Automatisation › + › App › choisis tes apps › « Est ouverte » › Exécuter immédiatement › action « Ouvrir les URL » avec ce lien :</p>
+    <div class="row"><input readonly value="https://hugo2aa.github.io/fight-camp/?defi=libre" aria-label="Lien du défi" id="defiLink"><button class="btn sm" data-act="copyDefi">Copier</button></div>
   </section>
   <section class="card">
     <h2>Mon compte</h2>
@@ -1363,8 +1401,9 @@ Réponds uniquement avec ce JSON :
   if (tab==="train") render();
 }
 function viewTraining(){
-  const seg = `<div class="seg" role="tablist"><button role="tab" data-act="trainSub" data-v="prog" aria-selected="${trainSub==="prog"}">Programme</button><button role="tab" data-act="trainSub" data-v="flex" aria-selected="${trainSub==="flex"}">Souplesse</button></div>`;
-  return seg + (trainSub==="flex" ? viewFlex() : viewProgram());
+  const t = (v,l)=>`<button role="tab" data-act="trainSub" data-v="${v}" aria-selected="${trainSub===v}">${l}</button>`;
+  const seg = `<div class="seg" role="tablist" style="grid-template-columns:repeat(3,1fr)">${t("prog","Programme")}${t("plan","Planning")}${t("flex","Souplesse")}</div>`;
+  return seg + (trainSub==="flex" ? viewFlex() : trainSub==="plan" ? viewPlanning() : viewProgram());
 }
 function importCard(replace){
   return `<section class="card ${replace?"":"hi"}">
@@ -1575,6 +1614,215 @@ function wallpaperHTML(){
   </section>`;
 }
 
+/* ---------- Planning, notifications et défis ---------- */
+const VAPID_PUBLIC = "BOdtisEFrEVaccb9AV-HsppJxGLqvoPcAzkgYtrIDE7F54HueXWPKsR8NQeEMKurH1AnyUX9N3T4XgBZcRRBxAk";
+const DEFIS = [["pompes",20,"reps"],["squats",30,"reps"],["gainage",45,"s"],["burpees",10,"reps"],["shadow boxing",60,"s"],["fentes",20,"reps"],["crunchs",25,"reps"],["chaise contre le mur",45,"s"],["montées de genoux",40,"s"],["pompes diamant",12,"reps"]];
+const PLAN_KINDS = [["prog","Séance du coach"],["flex","Souplesse"],["combat","Combat / sparring"],["cardio","Cardio / footing"],["autre","Autre"]];
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+function notifCfg(){
+  profile.notif = Object.assign({pesee:"07:30", eau:"16:00", souplesse:"20:30", checklist:"21:45", defis:true, defisN:3, defisFrom:"10:00", defisTo:"21:00", defiMin:20}, profile.notif||{});
+  return profile.notif;
+}
+function hash(str){ let h = 2166136261; for (const c of str){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function atTime(dateKey, hhmm){ const [h,m] = (hhmm||"00:00").split(":").map(Number); const d = parseKey(dateKey); d.setHours(h, m, 0, 0); return d; }
+const toMin = s => { const [h,m] = s.split(":").map(Number); return h*60+m; };
+const fromMin = n => `${pad(Math.floor(n/60))}:${pad(n%60)}`;
+function defiSlots(dateKey){
+  const c = notifCfg(); const a = toMin(c.defisFrom), b = toMin(c.defisTo), n = Math.max(1, Math.min(6, c.defisN|0));
+  if (b - a < 30) return [];
+  const span = (b - a) / n; const out = [];
+  for (let i=0;i<n;i++){ const h = hash(dateKey + ":" + i); const t = Math.round(a + span*i + (h % Math.max(1, Math.floor(span*.8))));
+    const ex = DEFIS[(h >>> 3) % DEFIS.length]; out.push({time: fromMin(t), ex}); }
+  return out;
+}
+function planOccurrences(fromKey, toKey){
+  const out = [];
+  (profile.plan||[]).forEach(p=>{
+    const weeks = p.repeat ? Math.max(1, p.weeks||8) : 1;
+    for (let w=0; w<weeks; w++){
+      const dk = dkey(addDays(parseKey(p.date), 7*w));
+      if (dk < fromKey || dk > toKey) continue;
+      if ((p.ex||[]).includes(dk)) continue;
+      out.push({p, d:dk, at: atTime(dk, p.time)});
+    }
+  });
+  return out.sort((a,b)=>a.at-b.at);
+}
+function planTitle(p){
+  if (p.kind==="prog" && profile.program && profile.program.seances[p.ref]) return profile.program.seances[p.ref].nom;
+  if (p.kind==="flex"){ const r = ROUTINES.find(x=>x.id===p.ref); if (r) return r.nom; }
+  return p.title || (PLAN_KINDS.find(k=>k[0]===p.kind)||[,"Séance"])[1];
+}
+function buildNotifs(){
+  const c = notifCfg(), now = new Date(), rows = [];
+  const add = (at, title, body, url, kind, ref) => { if (at > now) rows.push({send_at: at.toISOString(), title, body, url, kind, ref: ref||null}); };
+  // séances planifiées : 30 jours
+  planOccurrences(dkey(), dkey(addDays(now, 30))).forEach(o=>{
+    const t = planTitle(o.p), when = new Date(o.at.getTime() - (o.p.remind||0)*60000);
+    add(when, o.p.remind ? `${t} dans ${o.p.remind>=60 ? (o.p.remind/60)+" h" : o.p.remind+" min"}` : `C'est l'heure : ${t}`,
+      o.p.remind ? `Prépare ton sac. Début à ${o.p.time}.` : "Ton adversaire s'entraîne aussi aujourd'hui.",
+      o.p.kind==="flex" ? "./?go=flex" : "./?go=train", "seance", o.p.id);
+  });
+  // rappels quotidiens + défis : 14 jours
+  for (let i=0;i<14;i++){
+    const dk = dkey(addDays(now, i));
+    if (c.pesee) add(atTime(dk, c.pesee), "Pesée du matin", "À jeun, après les toilettes. Note-la dans Fight Camp.", "./?go=weight", "pesee");
+    if (c.eau) add(atTime(dk, c.eau), "Eau", "Où en est ta bouteille ? Vise ton objectif du jour.", "./?go=today", "eau");
+    if (c.souplesse) add(atTime(dk, c.souplesse), "Souplesse : 10 minutes", "Hanches et high kick. Lance une routine guidée.", "./?go=flex", "souplesse");
+    if (c.checklist) add(atTime(dk, c.checklist), "Checklist du jour", "Coche tes victoires avant de dormir.", "./?go=today", "checklist");
+    if (c.defis) defiSlots(dk).forEach((s,j)=>{ const [n,q,u] = s.ex;
+      add(atTime(dk, s.time), `Défi : ${q}${u==="s"?" s de":""} ${n}`, "Maintenant. Pas dans 5 minutes. Ouvre pour valider.", `./?defi=${encodeURIComponent(dk+"_"+j)}`, "defi"); });
+  }
+  return rows;
+}
+let notifSyncT = null, notifSyncing = false;
+function scheduleNotifSync(){ clearTimeout(notifSyncT); notifSyncT = setTimeout(syncNotifs, 1500); }
+async function syncNotifs(){
+  if (!store.uid || notifSyncing || !navigator.onLine) return;
+  notifSyncing = true;
+  try{
+    const rows = buildNotifs();
+    const {error: de} = await sb.from("notifs").delete().eq("sent", false).gt("send_at", new Date().toISOString());
+    if (de) throw de;
+    for (let i=0;i<rows.length;i+=200){ const {error} = await sb.from("notifs").insert(rows.slice(i,i+200)); if (error) throw error; }
+    profile.notifSyncedAt = Date.now();
+  }catch(e){ /* nouvel essai au prochain changement */ }
+  notifSyncing = false;
+}
+function b64ToU8(b){ const p = "=".repeat((4 - b.length % 4) % 4); const s = atob((b + p).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from([...s].map(c=>c.charCodeAt(0))); }
+const push = {state:"?"};
+async function pushState(){
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return push.state = isIOS() && !isStandalone() ? "install" : "unsupported";
+  if (Notification.permission === "denied") return push.state = "denied";
+  try{ const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); push.state = sub && Notification.permission==="granted" ? "on" : "off"; }
+  catch(e){ push.state = "off"; }
+  return push.state;
+}
+async function enablePush(){
+  try{
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted"){ push.state = perm==="denied" ? "denied" : "off"; render(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey: b64ToU8(VAPID_PUBLIC)});
+    const j = sub.toJSON();
+    const {error} = await sb.from("push_subs").upsert({endpoint: j.endpoint, user_id: store.uid, sub: j});
+    if (error) throw error;
+    push.state = "on"; toast("Notifications activées"); syncNotifs(); render();
+  }catch(e){ toast("Activation impossible : réessaie depuis l'app installée"); }
+}
+async function testPush(){
+  const {error} = await sb.from("notifs").insert({send_at: new Date().toISOString(), title:"Fight Camp", body:"Les notifications marchent. Au travail.", url:"./", kind:"test"});
+  toast(error ? "Envoi impossible" : "Notification envoyée : elle arrive dans la minute");
+}
+function pushCardHTML(){
+  const st = push.state;
+  const msg = st==="on" ? "Notifications activées sur cet appareil."
+    : st==="install" ? "Sur iPhone, les notifications ne marchent qu'avec l'app installée : Safari › Partager › « Sur l'écran d'accueil », puis ouvre Fight Camp depuis l'icône."
+    : st==="denied" ? "Notifications refusées. Réglages iPhone › Notifications › Fight Camp › Autoriser."
+    : st==="unsupported" ? "Ce navigateur ne gère pas les notifications. Installe l'app sur l'écran d'accueil."
+    : "Active les notifications pour recevoir tes séances, tes rappels et tes défis.";
+  return `<section class="card ${st==="on"?"":"hi"}">
+    <div class="row between"><h2>Notifications</h2><span class="pill ${st==="on"?"good":"bad"}">${st==="on"?"Activées":"Désactivées"}</span></div>
+    <p class="small muted" style="margin:0">${msg}</p>
+    ${st==="off" ? `<button class="btn red" data-act="pushOn">Activer les notifications</button>` : ""}
+    ${st==="on" ? `<button class="btn sm ghost" data-act="pushTest">Envoyer une notification de test</button>` : ""}
+  </section>`;
+}
+
+/* --- Vue Planning --- */
+const planForm = {kind:"prog", ref:0, title:"", date:"", time:"18:30", dur:60, repeat:true, weeks:8, remind:30};
+function viewPlanning(){
+  const occ = planOccurrences(dkey(), dkey(addDays(new Date(), 13)));
+  const byDay = {}; occ.forEach(o=> (byDay[o.d] = byDay[o.d]||[]).push(o));
+  if (!planForm.date) planForm.date = dkey();
+  const f = planForm, pr = profile.program;
+  let agenda = "";
+  for (let i=0;i<14;i++){
+    const dk = dkey(addDays(new Date(), i)), list = byDay[dk]||[], dd = parseKey(dk);
+    if (!list.length && i>6) continue;
+    agenda += `<div class="agday ${i===0?"today":""}"><div class="agd"><b>${dd.toLocaleDateString("fr-FR",{weekday:"short"})}</b><span>${dd.getDate()}</span></div>
+      <div class="agl">${list.length ? list.map(o=>`<div class="agi k-${o.p.kind}"><div><div class="agt">${esc(planTitle(o.p))}</div><div class="small muted">${o.p.time} · ${o.p.dur||60} min${o.p.remind?` · rappel ${o.p.remind>=60?o.p.remind/60+" h":o.p.remind+" min"} avant`:""}${o.p.repeat?" · chaque semaine":""}</div></div>
+        <div class="row" style="flex-wrap:nowrap;gap:2px"><button class="x" data-act="planSkip" data-id="${o.p.id}" data-d="${o.d}" aria-label="Sauter cette séance" title="Sauter cette fois">⤼</button><button class="x" data-act="planDel" data-id="${o.p.id}" aria-label="Supprimer la série">×</button></div></div>`).join("") : `<div class="small muted" style="padding:6px 0">Repos</div>`}</div></div>`;
+  }
+  const refSel = f.kind==="prog" ? (pr ? `<label class="f" for="pl_ref">Séance<select id="pl_ref" data-pf="ref">${pr.seances.map((s,i)=>`<option value="${i}" ${+f.ref===i?"selected":""}>${esc(s.nom)}</option>`).join("")}</select></label>` : `<p class="small muted" style="margin:0">Importe d'abord le programme du coach, ou choisis « Autre ».</p>`)
+    : f.kind==="flex" ? `<label class="f" for="pl_ref">Routine<select id="pl_ref" data-pf="ref">${ROUTINES.map(r=>`<option value="${r.id}" ${f.ref===r.id?"selected":""}>${esc(r.nom)}</option>`).join("")}</select></label>`
+    : `<label class="f" for="pl_title">Nom<input id="pl_title" data-pf="title" value="${esc(f.title)}" placeholder="${f.kind==="combat"?"Sparring club":"Footing 30 min"}"></label>`;
+  return `
+  ${pushCardHTML()}
+  <section class="card">
+    <div class="row between"><h2>Mes 2 semaines</h2><button class="btn sm" data-act="icsExport" ${occ.length?"":"disabled"}>Ajouter au calendrier</button></div>
+    <div class="agenda">${agenda}</div>
+  </section>
+  <section class="card hi">
+    <h2>Programmer une séance</h2>
+    <div class="chips">${PLAN_KINDS.map(([k,l])=>`<button class="chip ${f.kind===k?"on":""}" data-act="pfKind" data-v="${k}">${l}</button>`).join("")}</div>
+    ${refSel}
+    <div class="grid2">
+      <label class="f" for="pl_date">Premier jour<input id="pl_date" type="date" data-pf="date" value="${f.date}"></label>
+      <label class="f" for="pl_time">Heure<input id="pl_time" type="time" data-pf="time" value="${f.time}"></label>
+      <label class="f" for="pl_dur">Durée (min)<input id="pl_dur" inputmode="numeric" data-pf="dur" value="${f.dur}"></label>
+      <label class="f" for="pl_rem">Rappel<select id="pl_rem" data-pf="remind">${[[0,"À l'heure"],[15,"15 min avant"],[30,"30 min avant"],[60,"1 h avant"],[120,"2 h avant"]].map(([v,l])=>`<option value="${v}" ${+f.remind===v?"selected":""}>${l}</option>`).join("")}</select></label>
+    </div>
+    <label class="row small" for="pl_rep" style="gap:8px"><input type="checkbox" id="pl_rep" data-pf="repeat" ${f.repeat?"checked":""} style="width:auto"> Répéter chaque semaine pendant
+      <input id="pl_weeks" data-pf="weeks" inputmode="numeric" value="${f.weeks}" style="width:56px;flex:none" aria-label="Nombre de semaines"> semaines</label>
+    <button class="btn red" data-act="planAdd">Programmer</button>
+  </section>`;
+}
+function icsText(){
+  const occ = planOccurrences(dkey(), dkey(addDays(new Date(), 90)));
+  const z = d => d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fight Camp//FR","CALSCALE:GREGORIAN"];
+  occ.forEach(o=>{ const end = new Date(o.at.getTime() + (o.p.dur||60)*60000);
+    lines.push("BEGIN:VEVENT", `UID:${o.p.id}-${o.d}@fightcamp`, `DTSTAMP:${z(new Date())}`, `DTSTART:${z(o.at)}`, `DTEND:${z(end)}`, `SUMMARY:${planTitle(o.p).replace(/[,;]/g," ")}`, "DESCRIPTION:Fight Camp");
+    if (o.p.remind) lines.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Fight Camp",`TRIGGER:-PT${o.p.remind}M`,"END:VALARM");
+    lines.push("END:VEVENT"); });
+  lines.push("END:VCALENDAR"); return lines.join("\r\n");
+}
+function nextPlanned(){ const o = planOccurrences(dkey(), dkey(addDays(new Date(), 14))).find(x=>x.at > new Date(Date.now()-3600e3)); return o||null; }
+
+/* --- Défi --- */
+let defi = null;
+function openDefi(key){
+  let ex;
+  if (key && key.includes("_")){ const [dk, j] = key.split("_"); const s = defiSlots(dk)[+j]; ex = s ? s.ex : null; }
+  if (!ex) ex = DEFIS[Math.floor(Math.random()*DEFIS.length)];
+  defi = {key: key || ("libre-"+Date.now()), n:ex[0], q:ex[1], u:ex[2], count:0, left:ex[2]==="s"?ex[1]:0, run:false};
+  let el = document.getElementById("defi"); if (!el){ el = document.createElement("div"); el.id = "defi"; el.className = "player"; document.body.appendChild(el); }
+  paintDefi();
+}
+function paintDefi(){
+  const el = document.getElementById("defi"); if (!el || !defi) return;
+  const done = defi.u==="s" ? defi.left<=0 : defi.count>=defi.q;
+  el.innerHTML = `
+    <div class="row between"><span class="kicker">Défi Fight Camp</span><button class="x" data-act="defiClose" aria-label="Fermer">×</button></div>
+    <div class="pname" style="margin-top:5vh">${defi.q}${defi.u==="s"?" secondes de":""} ${esc(defi.n)}</div>
+    ${defi.u==="s"
+      ? `<div class="big" style="color:${done?"var(--gold)":"var(--bone)"}">${Math.max(0,defi.left)}</div><div class="cue">${done?"Validé. Respect.":defi.run?"Tiens bon.":"Lance le chrono quand tu es en place."}</div>`
+      : `<button class="tapper ${done?"done":""}" data-act="defiTap" aria-label="Ajouter une répétition"><span class="big">${defi.count}</span><span class="cue">${done?"Validé. Respect.":"Touche à chaque répétition"}</span></button>`}
+    <div class="ctrl" style="grid-template-columns:1fr 1fr">
+      <button class="btn" data-act="defiClose">Plus tard</button>
+      ${defi.u==="s" && !done ? `<button class="btn red" data-act="defiRun">${defi.run?"Pause":"Chrono"}</button>` : `<button class="btn red" data-act="defiDone">${done?"Valider":"J'ai fini"}</button>`}
+    </div>`;
+}
+function closeDefi(){ if (defi && defi.tm) clearInterval(defi.tm); defi = null; const el = document.getElementById("defi"); if (el) el.remove(); }
+function finishDefi(){
+  const d = day(); d.defis = (d.defis||[]).filter(x=>x.key!==defi.key).concat({key:defi.key, n:defi.n, q:defi.q, u:defi.u, t:Date.now()});
+  saveDay(); closeDefi(); toast("Défi validé"); render();
+}
+function handleRoute(){
+  const q = new URLSearchParams(location.search);
+  if (q.has("defi")) openDefi(q.get("defi"));
+  const g = q.get("go");
+  if (g==="flex"){ trainSub = "flex"; tab = "train"; }
+  else if (g==="train"){ trainSub = "prog"; tab = "train"; }
+  else if (g && ["today","food","weight","mind","setup"].includes(g)) tab = g;
+  if (q.toString()) history.replaceState(null, "", location.pathname);
+}
+navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", e=>{
+  if (e.data && e.data.type==="open"){ const u = new URL(e.data.url, location.href); history.replaceState(null,"", u.pathname + u.search); handleRoute(); render(); }
+});
+
 /* ---------- Rendu ---------- */
 function render(){
   $("#hdate").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
@@ -1607,6 +1855,24 @@ document.addEventListener("click", async e=>{
   const d = day();
   switch(a){
     case "signup": doSignUp(); break;
+    case "goPlan": trainSub = "plan"; go("train"); break;
+    case "pushOn": enablePush(); break;
+    case "pushTest": testPush(); break;
+    case "pfKind": planForm.kind = b.dataset.v; planForm.ref = b.dataset.v==="flex" ? "high" : 0; render(); break;
+    case "planAdd": {
+      const f = planForm; if (!f.date || !f.time){ toast("Choisis un jour et une heure"); return; }
+      if (f.kind==="prog" && !profile.program){ toast("Importe d'abord ton programme"); return; }
+      profile.plan = (profile.plan||[]).concat({id:"p"+uid(), kind:f.kind, ref:f.kind==="prog"?+f.ref:f.ref, title:f.title.trim(), date:f.date, time:f.time, dur:+f.dur||60, repeat:!!f.repeat, weeks:+f.weeks||8, remind:+f.remind||0, ex:[]});
+      saveProfile(); scheduleNotifSync(); render(); toast("Séance programmée"); break; }
+    case "planDel": profile.plan = (profile.plan||[]).filter(p=>p.id!==b.dataset.id); saveProfile(); scheduleNotifSync(); render(); break;
+    case "planSkip": { const p = (profile.plan||[]).find(x=>x.id===b.dataset.id); if (p){ p.ex = (p.ex||[]).concat(b.dataset.d); saveProfile(); scheduleNotifSync(); render(); toast("Séance sautée"); } break; }
+    case "icsExport": try{ await downloadsCap.save({filename:"fight-camp-seances.ics", data:new Blob([icsText()], {type:"text/calendar"})}); }catch(err){} break;
+    case "defiNow": openDefi(null); break;
+    case "defiTap": if (navigator.vibrate) navigator.vibrate(15); defi.count++; paintDefi(); break;
+    case "defiRun": defi.run = !defi.run; clearInterval(defi.tm); if (defi.run){ try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} defi.tm = setInterval(()=>{ defi.left--; if (defi.left<=3 && defi.left>0) beep(660,90); if (defi.left<=0){ clearInterval(defi.tm); beep(1200,300); } paintDefi(); }, 1000); } paintDefi(); break;
+    case "defiDone": finishDefi(); break;
+    case "defiClose": closeDefi(); break;
+    case "copyDefi": try{ await navigator.clipboard.writeText($("#defiLink").value); toast("Lien copié"); }catch(err){ $("#defiLink").select(); } break;
     case "logout": await sb.auth.signOut(); break;
     case "importData": {
       try{ const j = JSON.parse($("#imp").value); if (!j.profile) throw 0;
@@ -1690,6 +1956,8 @@ document.addEventListener("change", async e=>{
     if (["age","height","startWeight","goalWeight","activity","deficit","kcalOverride","protOverride"].includes(f)) v = num(v);
     profile[f] = v; if (f==="goalWeight") profile.weightClass = "";
     saveProfile(); render(); return; }
+  if (el.dataset.pf){ const k = el.dataset.pf; planForm[k] = el.type==="checkbox" ? el.checked : el.value; if (k==="weeks"||k==="dur"||k==="remind") planForm[k] = +el.value||0; return; }
+  if (el.dataset.nf){ const c = notifCfg(), k = el.dataset.nf; c[k] = el.type==="checkbox" ? el.checked : (k==="defisN" ? +el.value : el.value); saveProfile(); scheduleNotifSync(); if (tab==="today"||el.type==="checkbox") render(); return; }
   if (el.dataset.dg !== undefined && draft){ draft.items[+el.dataset.dg].g = Math.max(0, Math.round(num(el.value)||0)); draft.name = ($("#dr_name")||{}).value || draft.name; render(); return; }
   if (el.id === "dishIn"){ const f = el.files[0]; el.value = ""; if (f){ tab = "food"; foodSub = "log"; analyzePhoto(f); } return; }
   if (el.id === "progIn"){ const fs = [...el.files]; el.value = ""; if (fs.length) importProgram(fs); return; }
