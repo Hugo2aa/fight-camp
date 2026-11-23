@@ -3613,6 +3613,7 @@ function openFightNight(mode, wk, trial){
   fn.arenaMod = null; if (!matchMedia("(prefers-reduced-motion: reduce)").matches) import("./lib/arena3d.js").then(m=>{ fn.arenaMod = m; }).catch(()=>{});
   if (window.speechSynthesis) speechSynthesis.getVoices();
 }
+function showMusPlay(){ const x = document.getElementById("fnExtra"); if (x && !document.getElementById("musPlayBtn")) x.insertAdjacentHTML("afterbegin", `<button class="btn red" id="musPlayBtn" data-act="musPlay">Lancer ma musique</button>`); }
 async function musFade(to, ms){
   const p = fn.mus; if (!p) return; let v = 100; try{ v = p.getVolume(); }catch(e){}
   const n = Math.max(1, Math.round(ms/100));
@@ -3665,7 +3666,7 @@ async function runFightNight(){
   crowdStart();
   if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp, hasMus = !!fn.mus;
-  if (hasMus){ try{ fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
+  if (hasMus){ try{ const a = fn.mus.a; if (a){ a.muted = false; a.volume = 1; const pr = a.play(); if (pr) pr.catch(()=>showMusPlay()); } else { fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); } }catch(e){ showMusPlay(); } }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
@@ -3873,7 +3874,10 @@ function audioAdapter(url){
 }
 async function makeMusicPlayer(){
   const c = career(); if (!(c.music && c.music.path)) return null;
-  try{ const r = await fetch(await audioUrl(c.music.path)); if (!r.ok) return null; const p = audioAdapter(URL.createObjectURL(await r.blob())); if (c.musicStart) p.seekTo(+c.musicStart); return p; }catch(e){ return null; }
+  try{ const r = await fetch(await audioUrl(c.music.path)); if (!r.ok) return null;
+    const p = audioAdapter(URL.createObjectURL(await r.blob())); p.a.load();
+    const st = +c.musicStart || 0; if (st) p.a.addEventListener("loadedmetadata", ()=>{ try{ p.a.currentTime = st; }catch(e){} }, {once:true});
+    return p; }catch(e){ return null; }
 }
 function makeAnnPlayer(elId){
   const s = annSrc();
@@ -4276,6 +4280,7 @@ document.addEventListener("click", async e=>{
     case "ytCal": openYtCal(); break;
     case "calClose": closeYtCal(); break;
     case "calPlay": if (cal.p && cal.p.a){ cal.replay = false; if (cal.p.a.paused) cal.p.playVideo(); else cal.p.pauseVideo(); } break;
+    case "musPlay": if (fn.mus && fn.mus.a){ fn.mus.a.play().then(()=>b.remove()).catch(()=>toast("Le téléphone bloque la lecture : touche encore")); } break;
     case "annPlay": if (fn.yt){ fn.yt.unMute(); fn.yt.playVideo(); } break;
     case "musDel": { const c = career(); if (c.music && c.music.path) sb.storage.from("audio").remove([c.music.path]).catch(()=>{}); c.music = null; saveProfile(); render(); toast("Musique retirée"); break; }
     case "annDel": { const c = career(); if (c.audio && c.audio.path) sb.storage.from("audio").remove([c.audio.path]).catch(()=>{}); c.audio = null; c.ytStart = ytT(c.yt||""); c.ytEnd = null; c.ytCues = []; saveProfile(); render(); toast("Fichier retiré"); break; }
