@@ -560,9 +560,10 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fn.cage3d .fnjumbo{top:calc(env(safe-area-inset-top) + 56px);opacity:.0}
 .fn.cage3d .fnjumbo.on{opacity:.92;transform:scale(.6);transform-origin:50% 0}
 .fn.cage3d:has(.fnjumbo.on) .fnstage{margin-top:0}
-.fn.cage3d .fn3d{transition:opacity 1.2s ease,filter .8s ease}
-.fn.cage3d.sc-black .fn3d{filter:brightness(.3)}
-.fn.cage3d.sc-dim .fn3d{filter:brightness(.7)}
+.fn3dshade{position:absolute;inset:0;z-index:1;background:#000;opacity:0;pointer-events:none;transition:opacity .8s ease}
+.fn.cage3d.sc-black .fn3dshade{opacity:.7}
+.fn.cage3d.sc-dim .fn3dshade{opacity:.3}
+.fn3d{transform:translateZ(0)}
 </style>
 </head>
 <body>
@@ -3624,7 +3625,7 @@ function openFightNight(mode, wk, trial){
   document.body.appendChild(el); document.body.style.overflow = "hidden";
   if (c.music && c.music.path){ const st = document.getElementById("fnStart"); st.disabled = true;
     const ready = () => { st.disabled = false; const l = document.getElementById("fnLoad"); if (l) l.textContent = "Monte le son et touche l'écran"; };
-    makeMusicPlayer().then(p=>{ if (fn.on) fn.mus = p; ready(); }); setTimeout(ready, 10000); }
+    fn.mus = makeMusicPlayer(); fn.mus.ready.then(ok=>{ if (!ok && fn.on){ const l = document.getElementById("fnLoad"); if (l) l.textContent = "Musique introuvable · touche quand même"; } ready(); }); setTimeout(ready, 5000); }
   else if (ytId(c.spotify)) makeYT("fnMus", ytId(c.spotify), ytT(c.spotify)).then(p=>{ if (fn.on) fn.mus = p; });
   const uri = (c.music && c.music.path) || ytId(c.spotify) ? null : spotifyUri(c.spotify);
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
@@ -3644,7 +3645,7 @@ function a3(fnName, arg){ const a = fn.arena; if (!a) return; try{ a[fnName](arg
 function stopArena(el){ const a = fn.arena; fn.arena = null; if (!a) return; const c = document.querySelector("#fn .fn3d"); if (c) c.classList.remove("on"); if (el) el.classList.remove("cage3d","walk3d"); setTimeout(()=>{ try{ a.stop(); }catch(e){} c && c.remove(); }, 1300); }
 function closeFightNight(){
   try{ fn.arena && fn.arena.stop(); }catch(e){} fn.arena = null;
-  fn.on = false; fn.run++; fxClose(); document.querySelectorAll(".fn3d").forEach(c=>c.remove()); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
+  fn.on = false; fn.run++; fxClose(); document.querySelectorAll(".fn3d,.fn3dshade").forEach(c=>c.remove()); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
   try{ fn.wake && fn.wake.release(); }catch(e){} fn.wake = null;
   const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
   const c = career(); if (fn.mode==="result" && c.pending){ c.pending = null; saveProfile(); }
@@ -3659,7 +3660,7 @@ function fnText(main, sub="", top="", mode=""){
 }
 function fnFlash(cls="flash"){ const el = document.getElementById("fn"); if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 function confetti(){
-  const cv = document.getElementById("fnCv"); if (!cv) return; const dpr = Math.min(2, devicePixelRatio||1);
+  const cv = document.getElementById("fnCv"); if (!cv) return; const dpr = fn.arena ? 1 : Math.min(2, devicePixelRatio||1);
   cv.width = innerWidth*dpr; cv.height = innerHeight*dpr; const g = cv.getContext("2d"); g.scale(dpr,dpr);
   const ps = [...Array(140)].map(()=>({x: Math.random()*innerWidth, y: -20 - Math.random()*innerHeight*.6, vx:(Math.random()-.5)*2, vy: 2+Math.random()*3.5, r: Math.random()*6.28, vr:(Math.random()-.5)*.3, c: ["#d9a43a","#efe7dc","#d7262e"][Math.floor(Math.random()*3)], w: 5+Math.random()*7}));
   const run = fn.run, t0 = performance.now();
@@ -3688,8 +3689,8 @@ async function runFightNight(){
   // 1. L'entrée : musique + foule
   crowdStart();
   if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
-  const hasSp = !!fn.sp, hasMus = !!fn.mus;
-  if (hasMus){ try{ const a = fn.mus.a; if (a){ a.muted = false; a.volume = 1; if (arenaFxOk()) fn.mus.attachFx(.5); const pr = a.play(); if (pr) pr.catch(()=>showMusPlay()); } else { fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); } }catch(e){ showMusPlay(); } }
+  const hasSp = !!fn.sp, hasMus = !!fn.mus && !fn.mus.failed;
+  if (hasMus){ try{ if (fn.mus.go) fn.mus.go(); else { fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); } }catch(e){ showMusPlay(); } }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
@@ -3699,6 +3700,7 @@ async function runFightNight(){
   let arena = null, cv3 = null;
   if (fn.arenaMod){ try{
     cv3 = document.createElement("canvas"); cv3.className = "fn3d"; el.insertBefore(cv3, el.firstChild); el.classList.add("walk3d");
+    const shade = document.createElement("i"); shade.className = "fn3dshade"; cv3.after(shade);
     let roared = 0;
     crowdLevel(.05, .5);
     arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, myColor: 0xc81e28, oppColor: 0x1f4fb4, top: opp.title ? "Combat pour le titre" : "Main event", record: `${W}-${L}-${D}`, rank: RANKS[ri][0],
@@ -3930,12 +3932,34 @@ function audioAdapter(url){
     setVolume(v){ if (this.g) this.g.gain.value = v/100; else a.volume = Math.max(0, Math.min(1, v/100)); },
     getVolume(){ return this.g ? this.g.gain.value*100 : a.volume*100; }};
 }
-async function makeMusicPlayer(){
+// Un court silence : joué au toucher, il « déverrouille » le lecteur sur iPhone même si la musique n'est pas encore chargée
+const SILENT_WAV = (()=>{ const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, t) => [...t].forEach((ch, i)=>{ b[o+i] = ch.charCodeAt(0); });
+  w(0,"RIFF"); v.setUint32(4, 36 + n, true); w(8,"WAVE"); w(12,"fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36,"data"); v.setUint32(40, n, true); b.fill(128, 44);
+  let bin = ""; b.forEach(x=>{ bin += String.fromCharCode(x); }); return "data:audio/wav;base64," + btoa(bin); })();
+function makeMusicPlayer(){
   const c = career(); if (!(c.music && c.music.path)) return null;
-  try{ const r = await fetch(await audioUrl(c.music.path)); if (!r.ok) return null;
-    const p = audioAdapter(URL.createObjectURL(await r.blob())); p.a.load();
-    const st = +c.musicStart || 0; if (st) p.a.addEventListener("loadedmetadata", ()=>{ try{ p.a.currentTime = st; }catch(e){} }, {once:true});
-    return p; }catch(e){ return null; }
+  const p = audioAdapter(SILENT_WAV), st = +c.musicStart || 0; p.loaded = false; p.want = false; p.cross = false;
+  const setSrc = (u, cross) => { p.cross = cross; p.a.src = u; p.a.load(); p.loaded = true;
+    p.a.addEventListener("loadedmetadata", ()=>{ if (st){ try{ p.a.currentTime = st; }catch(e){} } }, {once:true});
+    if (p.want) p.go(); return true; };
+  p.ready = (async()=>{
+    let url = null; for (let k=0; k<3 && !url; k++){ try{ url = await audioUrl(c.music.path); }catch(e){ await wait(800); } }
+    if (!url){ p.failed = true; return false; }
+    // Fichier complet en mémoire (son d'arène possible), sinon lecture directe en streaming
+    try{ const ctl = new AbortController(), to = setTimeout(()=>ctl.abort(), 12000); const r = await fetch(url, {signal: ctl.signal}); clearTimeout(to);
+      if (r.ok) return setSrc(URL.createObjectURL(await r.blob()), false); }catch(e){}
+    return setSrc(url, true);
+  })();
+  // À appeler pendant le toucher : lance la musique, ou la lancera dès qu'elle est chargée
+  p.go = () => { p.want = true; const a = p.a; a.muted = false; a.volume = 1; const pr = a.play(); if (pr) pr.catch(()=>{ if (p.loaded) showMusPlay(); });
+    if (!p.loaded) return;
+    clearTimeout(p.wd); p.wd = setTimeout(()=>{ if (!fn.on || fn.mus !== p) return;
+      if (a.paused || a.currentTime < .05){ const r2 = a.play(); if (r2) r2.catch(()=>showMusPlay()); setTimeout(()=>{ if (fn.on && fn.mus === p && a.paused) showMusPlay(); }, 1500); } }, 2500); };
+  // Son d'arène branché une fois la musique partie, seulement si le moteur audio tourne (sinon ce serait muet)
+  p.a.addEventListener("playing", ()=>{ if (!p.loaded || p.cross || p.g || !arenaFxOk() || !fx.ctx) return;
+    const go = () => { if (fx.ctx && fx.ctx.state === "running" && !p.g) p.attachFx(.5); };
+    if (fx.ctx.state === "running") go(); else fx.ctx.resume().then(go).catch(()=>{}); });
+  return p;
 }
 function makeAnnPlayer(elId){
   const s = annSrc();
@@ -4339,7 +4363,7 @@ document.addEventListener("click", async e=>{
     case "ytCal": openYtCal(); break;
     case "calClose": closeYtCal(); break;
     case "calPlay": if (cal.p && cal.p.a){ cal.replay = false; if (cal.p.a.paused) cal.p.playVideo(); else cal.p.pauseVideo(); } break;
-    case "musPlay": if (fn.mus && fn.mus.a){ fn.mus.a.play().then(()=>b.remove()).catch(()=>toast("Le téléphone bloque la lecture : touche encore")); } break;
+    case "musPlay": if (fn.mus && fn.mus.a){ fxInit(); try{ fx.ctx && fx.ctx.resume(); }catch(e){} fn.mus.want = true; fn.mus.a.muted = false; fn.mus.a.play().then(()=>b.remove()).catch(()=>toast("Le téléphone bloque la lecture : touche encore")); } break;
     case "annPlay": if (fn.yt){ fn.yt.unMute(); fn.yt.playVideo(); } break;
     case "musDel": { const c = career(); if (c.music && c.music.path) sb.storage.from("audio").remove([c.music.path]).catch(()=>{}); c.music = null; saveProfile(); render(); toast("Musique retirée"); break; }
     case "annDel": { const c = career(); if (c.audio && c.audio.path) sb.storage.from("audio").remove([c.audio.path]).catch(()=>{}); c.audio = null; c.ytStart = ytT(c.yt||""); c.ytEnd = null; c.ytCues = []; saveProfile(); render(); toast("Fichier retiré"); break; }
