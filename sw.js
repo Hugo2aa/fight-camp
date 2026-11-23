@@ -1,5 +1,5 @@
 // Fight Camp : met l'app en cache pour qu'elle s'ouvre vite, même sans réseau.
-const VERSION = "fc-v32";
+const VERSION = "fc-v33";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./ciqual.json", "./flags/corse.jpg",
   "./lib/supabase.js", "./lib/591.supabase.js",
