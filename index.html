@@ -541,6 +541,10 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .eyewrap.dive{animation:dive .45s cubic-bezier(.7,0,.9,.4) forwards}
 @keyframes dive{to{transform:scale(9);opacity:0;filter:blur(6px)}}
 .fn.sc-name .fnmain span{animation-duration:.6s}
+
+#wpFloat{position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:25;width:112px;padding:0;border:2px solid var(--gold);border-radius:14px;overflow:hidden;background:#000;box-shadow:0 14px 40px rgba(0,0,0,.7);opacity:0;transform:translateY(16px) scale(.92);pointer-events:none;transition:opacity .25s,transform .25s;cursor:pointer}
+#wpFloat.on{opacity:1;transform:none;pointer-events:auto}
+#wpFloat img{display:block;width:100%;aspect-ratio:1170/2532;object-fit:cover}
 </style>
 </head>
 <body>
@@ -3026,7 +3030,7 @@ async function refreshWallpaper(){
   wall.err = ""; const b = await makeWallpaper(wall);
   if (!b){ wall.err = "Cette photo ne peut pas servir de fond. Choisis un autre fond."; if (tab==="mind") render(); return; }
   if (wall.url) URL.revokeObjectURL(wall.url); wall.url = URL.createObjectURL(b); wall.blob = b;
-  const im = document.getElementById("wpImg"); if (im) im.src = wall.url; else if (tab==="mind") render();
+  const im = document.getElementById("wpImg"); if (im){ im.src = wall.url; const f = document.querySelector("#wpFloat img"); if (f) f.src = wall.url; } else if (tab==="mind") render();
 }
 function wallpaperHTML(){
   const q = wallQuote(wall);
@@ -4176,6 +4180,22 @@ function render(){
   if (tab==="today") animateHero();
   if (tab==="mind" && !wall.url && !wall.pending){ wall.pending = true; refreshWallpaper().finally(()=>wall.pending=false); }
   if (tab==="mind") buildThumbs();
+  watchWallPreview();
+}
+// Aperçu flottant : quand l'aperçu du fond d'écran sort de l'écran pendant les réglages, une miniature le suit
+let wpObs = null;
+function watchWallPreview(){
+  if (wpObs){ wpObs.disconnect(); wpObs = null; }
+  let fl = document.getElementById("wpFloat");
+  const sec = document.getElementById("wallpaper"), img = document.getElementById("wpImg");
+  if (!sec || !img || !("IntersectionObserver" in window)){ if (fl) fl.remove(); return; }
+  if (!fl){ fl = document.createElement("button"); fl.id = "wpFloat"; fl.setAttribute("aria-label", "Voir l'aperçu du fond d'écran"); fl.innerHTML = `<img alt="">`; document.body.appendChild(fl);
+    fl.onclick = () => document.getElementById("wpImg")?.scrollIntoView({behavior:"smooth", block:"center"}); }
+  fl.querySelector("img").src = img.src;
+  const st = {img:true, sec:false};
+  const upd = () => fl.classList.toggle("on", st.sec && !st.img);
+  wpObs = new IntersectionObserver(es=>{ es.forEach(e=>{ if (e.target === img) st.img = e.intersectionRatio > .35; else st.sec = e.isIntersecting; }); upd(); }, {threshold:[0, .35, 1]});
+  wpObs.observe(img); wpObs.observe(sec);
 }
 function go(t){ const prev = tab; tab=t; render(); window.scrollTo(0,0); if (t==="mind" && prev!=="mind") mindIntro(); }
 
