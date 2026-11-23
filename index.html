@@ -414,6 +414,7 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fnsp.gone{opacity:0;pointer-events:none}
 .fnstart{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.55);border:0;color:var(--bone);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:inherit}
 .fnstart b{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(40px,12vw,70px);line-height:.95;padding:0 20px}
+.fnstart:disabled{cursor:wait}
 .fnstart span:last-child{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:13px}
 @media (prefers-reduced-motion: reduce){.fnbeams i{animation:none}.fn.flash::after,.fn.gold::after{animation:none;opacity:0}}
 
@@ -448,7 +449,7 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fnscene{display:flex;justify-content:center}
 .fnscene:empty{display:none}
 .fnscene .art.in{animation:rise .6s ease-out both}
-.flag{width:min(62vw,300px);border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.flag{display:block;width:min(62vw,300px);border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 @keyframes flagw{from{transform:perspective(600px) rotateY(-14deg) skewY(-2deg)}to{transform:perspective(600px) rotateY(10deg) skewY(2deg)}}
 @keyframes grow{from{height:0}to{height:100%}}
 .art-scale,.art-age{display:flex;align-items:baseline;gap:8px;font-family:var(--display)}
@@ -3060,7 +3061,11 @@ function viewCareer(){
     <label class="f" for="cr_name">Nom de combattant<input id="cr_name" data-cr="name" value="${esc(c.name)}" placeholder="Hugo"></label>
     <label class="f" for="cr_nick">Surnom<input id="cr_nick" data-cr="nick" value="${esc(c.nick)}" placeholder="Ex : Le Cutter"></label>
     <h3>1. Ta musique d'entrée</h3>
-    <label class="f" for="cr_sp">Lien YouTube (son complet) ou Spotify (extrait de 30 s)<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://youtu.be/…" inputmode="url"></label>
+    <div class="row between"><span class="small">${c.music && c.music.path ? `Fichier : <b>${esc(c.music.name||"musique")}</b>` : "Fichier audio, sans pub (mp3, m4a…)"}</span>
+      <div class="row" style="gap:8px">${c.music && c.music.path ? `<button class="btn sm ghost" data-act="musDel">Retirer</button>` : ""}<label class="btn sm" for="musIn">${c.music && c.music.path ? "Changer" : "Choisir un fichier"}</label></div></div>
+    <input type="file" id="musIn" accept="audio/*,.mp3,.m4a,.wav,.aac" class="hidden">
+    ${c.music && c.music.path ? `<label class="f" for="cr_ms">Démarrer à (secondes, pour tomber direct sur le refrain)<input id="cr_ms" data-cr="musicStart" inputmode="numeric" value="${esc(c.musicStart||"")}" placeholder="0"></label>` : ""}
+    <label class="f" for="cr_sp">${c.music && c.music.path ? "Ou un lien (le fichier passe en priorité)" : "Ou un lien YouTube (son complet) ou Spotify (extrait de 30 s)"}<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://youtu.be/…" inputmode="url"></label>
     <p class="small muted" style="margin:0">${ytId(c.spotify) ? `Son complet depuis YouTube${ytT(c.spotify)?`, à partir de ${ytT(c.spotify)} s`:""}. Il reprend aussi quand tu gagnes.` : spotifyUri(c.spotify) ? "Spotify ne joue qu'un extrait de 30 s dans une app web. Pour le son complet, colle plutôt le lien YouTube du même morceau." : "Sur YouTube : Partager › Copier le lien. Pour démarrer au refrain, coche « Commencer à » avant de copier. Sans lien, l'app joue un beat d'arène."}</p>
     <h3>2. L'annonce</h3>
     <div class="row between"><span class="small">${c.audio && c.audio.path ? `Fichier : <b>${esc(c.audio.name||"annonce")}</b>` : "Fichier audio (mp3, m4a, wav…)"}</span>
@@ -3181,12 +3186,15 @@ function openFightNight(mode, wk, trial){
   el.innerHTML = `<canvas id="fnCv" aria-hidden="true"></canvas><div class="fnbeams" aria-hidden="true"><i></i><i></i><i></i></div>
     <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
     <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnScene" class="fnscene"></div><div id="fnExtra"></div><div id="fnSh" class="sh"></div></div>
-    <div class="fnsp" id="fnSpWrap">${ytId(c.spotify) ? `<div class="fnmus"><div id="fnMus"></div></div>` : `<div id="fnSp"></div>`}</div>
+    <div class="fnsp" id="fnSpWrap">${c.music && c.music.path ? "" : ytId(c.spotify) ? `<div class="fnmus"><div id="fnMus"></div></div>` : `<div id="fnSp"></div>`}</div>
     ${annSrc()==="yt" ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
-    <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":mode==="fight"?(trial?"Essai du combat":"Combat du week-end"):"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
+    <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":mode==="fight"?(trial?"Essai du combat":"Combat du week-end"):"Le combat va commencer"}</b><span id="fnLoad">${c.music && c.music.path ? "Chargement de ta musique…" : "Monte le son et touche l'écran"}</span></button>`;
   document.body.appendChild(el); document.body.style.overflow = "hidden";
-  if (ytId(c.spotify)) makeYT("fnMus", ytId(c.spotify), ytT(c.spotify)).then(p=>{ if (fn.on) fn.mus = p; });
-  const uri = ytId(c.spotify) ? null : spotifyUri(c.spotify);
+  if (c.music && c.music.path){ const st = document.getElementById("fnStart"); st.disabled = true;
+    const ready = () => { st.disabled = false; const l = document.getElementById("fnLoad"); if (l) l.textContent = "Monte le son et touche l'écran"; };
+    makeMusicPlayer().then(p=>{ if (fn.on) fn.mus = p; ready(); }); setTimeout(ready, 10000); }
+  else if (ytId(c.spotify)) makeYT("fnMus", ytId(c.spotify), ytT(c.spotify)).then(p=>{ if (fn.on) fn.mus = p; });
+  const uri = (c.music && c.music.path) || ytId(c.spotify) ? null : spotifyUri(c.spotify);
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
   if (annSrc()) makeAnnPlayer("fnYt").then(p=>{ if (fn.on) fn.yt = p; });
   if (window.speechSynthesis) speechSynthesis.getVoices();
@@ -3243,7 +3251,7 @@ async function runFightNight(){
   crowdStart();
   if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp, hasMus = !!fn.mus;
-  if (hasMus){ try{ fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
+  if (hasMus){ try{ fn.mus.attachFx && fn.mus.attachFx(); fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
@@ -3333,7 +3341,7 @@ function fiche(){ const c = career(); c.fiche = Object.assign({}, FICHE_DEF, c.f
 function toCm(h){ const m = String(h).match(/(\d)\s*['’]\s*(\d{1,2})?/); if (m) return Math.round((+m[1]*12 + (+m[2]||0)) * 2.54); const n = parseFloat(String(h).replace(",", ".")); return n > 100 ? Math.round(n) : n > 1 && n < 2.5 ? Math.round(n*100) : null; }
 function toKg(w){ const n = parseFloat(String(w).replace(",", ".")); if (!n) return null; return /lb/i.test(w) ? Math.round(n*0.4536*10)/10 : n; }
 const FLAGS = {
-  corse: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="300" height="200" fill="#fff"/><path fill="#111" d="M130 38 C166 28 197 50 199 86 C201 110 192 125 182 133 L184 160 C184 168 178 173 170 173 L142 173 C135 173 131 168 131 162 L131 149 C123 149 118 145 118 140 C114 138 114 133 117 130 C113 128 113 123 117 121 L113 114 C109 110 108 106 112 102 L116 91 C112 85 112 79 116 75 C115 55 120 44 130 38 Z"/><path fill="#fff" d="M114 69 C142 60 171 56 199 58 L200 73 C172 71 143 75 116 84 Z"/><path fill="#fff" stroke="#111" stroke-width="2.5" stroke-linejoin="round" d="M196 61 L226 47 L216 70 Z M197 70 L228 84 L210 82 Z"/></svg>`,
+  corse: `<img src="flags/corse.jpg" alt="Drapeau de la Corse" class="flag">`,
   russie: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="300" height="67" fill="#fff"/><rect y="67" width="300" height="66" fill="#1c3f94"/><rect y="133" width="300" height="67" fill="#d52b1e"/></svg>`,
   france: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="100" height="200" fill="#1f3c8c"/><rect x="100" width="100" height="200" fill="#fff"/><rect x="200" width="100" height="200" fill="#e1251b"/></svg>`,
   italie: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="100" height="200" fill="#0b8a43"/><rect x="100" width="100" height="200" fill="#fff"/><rect x="200" width="100" height="200" fill="#cf2b37"/></svg>`
@@ -3430,7 +3438,15 @@ function audioAdapter(url){
   const a = new Audio(); a.src = url; a.preload = "auto"; a.setAttribute("playsinline", "");
   return {a, getCurrentTime:()=>a.currentTime, playVideo:()=>{ const pr = a.play(); pr && pr.catch(()=>{}); }, pauseVideo:()=>a.pause(),
     seekTo:t=>{ try{ a.currentTime = t; }catch(e){} }, getPlayerState:()=> a.ended ? 0 : !a.paused ? 1 : 2,
-    mute:()=>{ a.muted = true; }, unMute:()=>{ a.muted = false; }, destroy:()=>{ a.pause(); a.removeAttribute("src"); a.load(); }, getDuration:()=>a.duration||0};
+    mute:()=>{ a.muted = true; }, unMute:()=>{ a.muted = false; }, destroy:()=>{ a.pause(); a.removeAttribute("src"); a.load(); }, getDuration:()=>a.duration||0,
+    // Le volume passe par Web Audio : sur iPhone, le volume d'un élément audio n'est pas réglable par le code
+    attachFx(){ if (this.g || !fx.ctx) return; try{ const src = fx.ctx.createMediaElementSource(a); this.g = fx.ctx.createGain(); src.connect(this.g); this.g.connect(fx.out); }catch(e){} },
+    setVolume(v){ if (this.g) this.g.gain.value = v/100; else a.volume = Math.max(0, Math.min(1, v/100)); },
+    getVolume(){ return this.g ? this.g.gain.value*100 : a.volume*100; }};
+}
+async function makeMusicPlayer(){
+  const c = career(); if (!(c.music && c.music.path)) return null;
+  try{ const r = await fetch(await audioUrl(c.music.path)); if (!r.ok) return null; const p = audioAdapter(URL.createObjectURL(await r.blob())); if (c.musicStart) p.seekTo(+c.musicStart); return p; }catch(e){ return null; }
 }
 function makeAnnPlayer(elId){
   const s = annSrc();
@@ -3439,16 +3455,18 @@ function makeAnnPlayer(elId){
   return Promise.resolve(null);
 }
 const AUDIO_EXT = {mp3:"audio/mpeg", m4a:"audio/x-m4a", aac:"audio/aac", wav:"audio/wav", ogg:"audio/ogg", flac:"audio/flac", mp4:"audio/mp4", webm:"audio/webm", caf:"audio/x-caf"};
-async function uploadAnnounce(file){
+async function uploadAnnounce(file, kind="annonce"){
   if (!store.uid){ toast("Connecte-toi d'abord"); return; }
   if (file.size > 25*1024*1024){ toast("Fichier trop lourd (25 Mo maximum)"); return; }
   const ext = (file.name.split(".").pop()||"mp3").toLowerCase().replace(/[^a-z0-9]/g,"") || "mp3";
   const type = file.type || AUDIO_EXT[ext] || "audio/mpeg";
   toast("Envoi du fichier…");
-  const path = `${store.uid}/annonce-${Date.now()}.${ext}`;
+  const path = `${store.uid}/${kind}-${Date.now()}.${ext}`;
   const {error} = await sb.storage.from("audio").upload(path, file, {contentType:type, upsert:true});
   if (error){ toast("L'envoi n'a pas marché : " + (/mime/i.test(error.message||"") ? "format non accepté" : "réessaie")); return; }
-  const c = career(), old = c.audio && c.audio.path;
+  const c = career();
+  if (kind === "musique"){ const old = c.music && c.music.path; c.music = {path, name: file.name.slice(0,80)}; saveProfile(); if (old) sb.storage.from("audio").remove([old]).catch(()=>{}); toast("Musique enregistrée"); render(); return; }
+  const old = c.audio && c.audio.path;
   c.audio = {path, name: file.name.slice(0,80)}; c.ytStart = 0; c.ytEnd = null; c.ytCues = []; saveProfile();
   if (old) sb.storage.from("audio").remove([old]).catch(()=>{});
   toast("Annonce enregistrée"); render();
@@ -3816,6 +3834,7 @@ document.addEventListener("click", async e=>{
     case "calClose": closeYtCal(); break;
     case "calPlay": if (cal.p && cal.p.a){ cal.replay = false; if (cal.p.a.paused) cal.p.playVideo(); else cal.p.pauseVideo(); } break;
     case "annPlay": if (fn.yt){ fn.yt.unMute(); fn.yt.playVideo(); } break;
+    case "musDel": { const c = career(); if (c.music && c.music.path) sb.storage.from("audio").remove([c.music.path]).catch(()=>{}); c.music = null; saveProfile(); render(); toast("Musique retirée"); break; }
     case "annDel": { const c = career(); if (c.audio && c.audio.path) sb.storage.from("audio").remove([c.audio.path]).catch(()=>{}); c.audio = null; c.ytStart = ytT(c.yt||""); c.ytEnd = null; c.ytCues = []; saveProfile(); render(); toast("Fichier retiré"); break; }
     case "calStart": cal.start = calTime(); cal.cues = cal.cues.filter(t=>t>cal.start); paintCal(); toast("Début calé"); break;
     case "calEnd": { const t = calTime(); if (t <= cal.start){ toast("La fin doit être après le début"); break; } cal.end = t; cal.cues = cal.cues.filter(x=>x<t); paintCal(); toast("Fin calée"); break; }
@@ -3929,6 +3948,7 @@ document.addEventListener("click", async e=>{
 document.addEventListener("change", async e=>{
   const el = e.target;
   if (el.id==="annIn"){ const f = el.files && el.files[0]; el.value = ""; if (f) uploadAnnounce(f); return; }
+  if (el.id==="musIn"){ const f = el.files && el.files[0]; el.value = ""; if (f) uploadAnnounce(f, "musique"); return; }
   if (el.dataset.cr==="yt"){ const c = career(); c.yt = el.value.trim(); if (!(c.audio && c.audio.path)){ c.ytStart = ytT(c.yt); c.ytEnd = null; c.ytCues = []; } saveProfile(); if (c.yt && !ytId(c.yt)) toast("Lien YouTube non reconnu"); render(); return; }
   if (el.dataset.cr){ career()[el.dataset.cr] = el.value.trim(); saveProfile(); if (el.dataset.cr==="spotify"){ if (el.value && !spotifyUri(el.value) && !ytId(el.value)) toast("Lien non reconnu"); render(); } return; }
   if (el.dataset.fi){ fiche()[el.dataset.fi] = el.value.trim(); saveProfile(); return; }
