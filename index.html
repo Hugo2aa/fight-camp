@@ -2240,97 +2240,73 @@ const POSES = {
   champion:{nom:"Champion", f:0, belt:true, head:[.5,.13], neck:[.5,.19], sF:[.615,.24], sB:[.385,.24], hF:[.56,.535], hB:[.44,.535],
     eF:[.7,.14], gF:[.64,.035], eB:[.3,.14], gB:[.36,.035], kF:[.59,.76], aF:[.615,.957], tF:[.675,.985], kB:[.41,.76], aB:[.385,.957], tB:[.325,.985]}
 };
+// Silhouettes dessinées à la main : contour du corps + bras + tête, en coordonnées 0..1 (hauteur)
+const SIL = (() => {
+  const mirror = pts => pts.map(([x,y])=>[1-x, y]);
+  const half = (pts, dy=0) => { const R = pts.map(([x,y])=>[.5+x, y+dy]); const L = pts.slice().reverse().map(([x,y])=>[.5-x, y+dy]); return R.concat(L.slice(1)); };
+  // Corps de face (moitié droite de l'image, du cou à l'entrejambe)
+  const FRONT = [[.034,.125],[.06,.146],[.11,.162],[.16,.178],[.188,.2],[.192,.232],[.168,.265],[.14,.29],[.132,.33],[.112,.39],[.108,.42],[.118,.45],[.13,.49],[.138,.535],[.14,.58],[.13,.64],[.118,.7],[.122,.73],[.13,.78],[.124,.84],[.1,.925],[.104,.955],[.128,.982],[.124,.996],[.06,.996],[.058,.96],[.062,.925],[.056,.85],[.054,.79],[.05,.735],[.045,.7],[.034,.62],[.022,.57],[0,.545]];
+  const sideProfile = [
+    [.49,.128],[.455,.15],[.425,.17],[.402,.193],[.39,.225],[.393,.262],[.405,.3],[.425,.35],[.432,.39],[.425,.425],[.412,.455],[.408,.49],[.398,.53],[.375,.585],[.352,.635],[.34,.675],[.322,.715],[.31,.755],[.3,.8],[.29,.86],[.276,.92],[.262,.955],[.268,.975],[.3,.984],[.34,.993],[.352,.985],[.34,.968],[.325,.955],[.33,.92],[.345,.86],[.362,.8],[.378,.745],[.395,.7],[.42,.645],[.448,.6],[.47,.565],[.49,.56],[.515,.585],[.54,.63],[.565,.68],[.572,.72],[.568,.77],[.562,.83],[.566,.9],[.57,.945],[.56,.97],[.565,.99],[.64,.995],[.705,.993],[.712,.982],[.69,.97],[.645,.955],[.618,.935],[.612,.9],[.618,.84],[.628,.78],[.636,.73],[.636,.69],[.624,.63],[.61,.58],[.598,.53],[.585,.49],[.58,.45],[.583,.4],[.592,.35],[.605,.3],[.612,.26],[.61,.225],[.596,.195],[.575,.172],[.556,.158],[.548,.135]];
+  return {
+    garde: { body: sideProfile, head: {c:[.535,.075], r:[.047,.061], rot:.15, jaw:[.552,.104,.034]},
+      arms: [ {s:[.592,.205], e:[.66,.29], w:[.69,.2], g:[.705,.162], ga:-1.35, far:true}, {s:[.465,.205], e:[.505,.33], w:[.575,.205], g:[.598,.142], ga:-1.1} ] },
+    jab: { body: sideProfile, head: {c:[.54,.077], r:[.047,.061], rot:.15, jaw:[.556,.106,.034]},
+      arms: [ {s:[.6,.205], e:[.71,.2], w:[.8,.19], g:[.845,.188], ga:-.05, far:true}, {s:[.465,.205], e:[.505,.33], w:[.575,.205], g:[.598,.142], ga:-1.1} ] },
+    victoire: { body: half(FRONT, .03), head: {c:[.5,.098], r:[.05,.063], rot:0, jaw:[.5,.128,.036]},
+      arms: [ {s:[.66,.215], e:[.75,.13], w:[.75,.06], g:[.755,.035], ga:-1.5}, {s:[.34,.215], e:[.25,.13], w:[.25,.06], g:[.245,.035], ga:-1.64} ] },
+    champion: { body: half(FRONT, .045), head: {c:[.5,.113], r:[.05,.063], rot:0, jaw:[.5,.143,.036]}, belt: true,
+      arms: [ {s:[.66,.23], e:[.78,.17], w:[.68,.07], g:[.655,.045], ga:-2.3}, {s:[.34,.23], e:[.22,.17], w:[.32,.07], g:[.345,.045], ga:-.85} ] },
+    kick: { body: [
+        [.36,.2],[.33,.215],[.31,.245],[.31,.285],[.325,.33],[.345,.37],[.355,.41],[.352,.45],[.358,.49],[.372,.54],[.392,.6],[.402,.66],[.405,.72],[.408,.78],[.41,.85],[.405,.92],[.385,.965],[.39,.985],[.45,.993],[.5,.99],[.5,.975],[.468,.955],[.455,.93],[.46,.86],[.462,.78],[.468,.72],[.478,.66],[.49,.6],[.505,.56],
+        [.56,.52],[.63,.47],[.7,.41],[.765,.345],[.82,.28],[.86,.225],[.9,.18],[.935,.15],[.955,.14],[.962,.125],[.948,.115],[.915,.12],[.88,.138],[.84,.16],[.8,.19],[.75,.235],[.69,.285],[.63,.33],[.565,.375],[.505,.405],
+        [.49,.37],[.475,.32],[.462,.27],[.44,.225],[.415,.2],[.39,.192]],
+      head: {c:[.345,.15], r:[.045,.058], rot:-.35, jaw:[.37,.175,.032]},
+      arms: [ {s:[.425,.215], e:[.47,.29], w:[.45,.2], g:[.43,.17], ga:-2.0, far:true}, {s:[.34,.225], e:[.255,.29], w:[.2,.33], g:[.175,.35], ga:2.6} ] }
+  };
+})();
+function drawSil(x, pose, cx, top, h, part="all"){
+  const S = SIL[pose]; if (!S) return;
+  const P = ([px,py]) => [cx + (px-.5)*h, top + py*h];
+  const smooth = pts => { const n = pts.length, p = pts.map(P); x.beginPath(); x.moveTo(p[0][0], p[0][1]);
+    for (let i=0;i<n;i++){ const p0 = p[(i-1+n)%n], p1 = p[i], p2 = p[(i+1)%n], p3 = p[(i+2)%n];
+      x.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6, p1[1]+(p2[1]-p0[1])/6, p2[0]-(p3[0]-p1[0])/6, p2[1]-(p3[1]-p1[1])/6, p2[0], p2[1]); } x.closePath(); x.fill(); };
+  const seg = (A, B, ra, rb, bulge=0, bt=.4) => { const a = P(A), b = P(B), dx = b[0]-a[0], dy = b[1]-a[1], L = Math.hypot(dx,dy)||1, nx = -dy/L, ny = dx/L, pts = [];
+    for (let i=0;i<=12;i++){ const t = i/12, r = (ra+(rb-ra)*t + bulge*Math.exp(-Math.pow((t-bt)/.28,2)))*h; pts.push([a[0]+dx*t+nx*r, a[1]+dy*t+ny*r]); }
+    for (let i=12;i>=0;i--){ const t = i/12, r = (ra+(rb-ra)*t + bulge*.5*Math.exp(-Math.pow((t-bt)/.28,2)))*h; pts.push([a[0]+dx*t-nx*r, a[1]+dy*t-ny*r]); }
+    x.beginPath(); pts.forEach(([px,py],i)=> i ? x.lineTo(px,py) : x.moveTo(px,py)); x.closePath(); x.fill();
+    x.beginPath(); x.arc(a[0], a[1], ra*h, 0, 7); x.fill(); x.beginPath(); x.arc(b[0], b[1], rb*h, 0, 7); x.fill(); };
+  const glove = a => { const g = P(a.g); x.save(); x.translate(g[0], g[1]); x.rotate(a.ga); x.beginPath(); x.ellipse(0, 0, .052*h, .04*h, 0, 0, 7); x.fill();
+    x.beginPath(); x.ellipse(-.02*h, .028*h, .022*h, .016*h, .4, 0, 7); x.fill(); x.restore(); seg(a.w, [(a.w[0]+a.g[0])/2, (a.w[1]+a.g[1])/2], .028, .034); };
+  const arm = a => { seg(a.s, a.e, .05, .036, .014, .35); seg(a.e, a.w, .038, .03, .008, .3); };
+  const head = () => { const H0 = S.head, c = P(H0.c); x.save(); x.translate(c[0], c[1]); x.rotate(H0.rot); x.beginPath(); x.ellipse(0, 0, H0.r[0]*h, H0.r[1]*h, 0, 0, 7); x.fill(); x.restore();
+    const j = P([H0.jaw[0], H0.jaw[1]]); x.beginPath(); x.arc(j[0], j[1], H0.jaw[2]*h, 0, 7); x.fill();
+    const nb = S.body[0]; seg([H0.c[0], H0.c[1]+.03], [H0.c[0]-.004, H0.c[1]+.075], .03, .036); };
+  if (part==="gloves"){ S.arms.forEach(glove); return; }
+  if (part==="far"){ S.arms.filter(a=>a.far).forEach(a=>{ arm(a); glove(a); }); return; }
+  S.arms.filter(a=>a.far).forEach(a=>{ arm(a); glove(a); });
+  smooth(S.body); head();
+  S.arms.filter(a=>!a.far).forEach(a=>{ arm(a); glove(a); });
+  if (S.belt && part==="all"){ const L = P(S.arms[1].g), R = P(S.arms[0].g); x.fillRect(L[0], L[1]-.03*h, R[0]-L[0], .06*h); }
+}
 function drawFighter(g, pose, cx, top, h, opt={}){
-  const P = POSES[pose], W = 1170, H = 2532, u = h;
-  const pt = k => [cx + (P[k][0]-.5)*h, top + P[k][1]*h];
-  const lerp = (A,B,t)=>[A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t];
+  const W = 1170, H = 2532, u = h;
   const mk = () => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c; };
-  // Segment musclé : contour en courbes avec un renflement de chaque côté
-  function muscle(x, A, B, ra, rb, bulgeA, bulgeB, tA=.4, tB=.4){
-    const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
-    const ca = lerp(A,B,tA), cb = lerp(A,B,tB);
-    x.beginPath(); x.moveTo(A[0]+nx*ra, A[1]+ny*ra);
-    x.quadraticCurveTo(ca[0]+nx*bulgeA, ca[1]+ny*bulgeA, B[0]+nx*rb, B[1]+ny*rb);
-    x.lineTo(B[0]-nx*rb, B[1]-ny*rb);
-    x.quadraticCurveTo(cb[0]-nx*bulgeB, cb[1]-ny*bulgeB, A[0]-nx*ra, A[1]-ny*ra);
-    x.closePath(); x.fill();
-    x.beginPath(); x.arc(A[0],A[1],ra,0,7); x.fill(); x.beginPath(); x.arc(B[0],B[1],rb,0,7); x.fill();
-  }
-  function leg(x, hp, k, a, t, front){
-    const H0 = pt(hp), K = pt(k), A = pt(a), T = pt(t);
-    muscle(x, H0, K, .056*u, .04*u, .07*u, .064*u, .36, .45);      // cuisse : quadriceps et ischios
-    muscle(x, K, A, .041*u, .022*u, .044*u, .056*u, .55, .32);       // mollet bombé derrière
-    const ang = Math.atan2(T[1]-A[1], T[0]-A[0]), Lf = Math.hypot(T[0]-A[0], T[1]-A[1]);   // pied, dans son propre repère
-    x.save(); x.translate(A[0], A[1]); x.rotate(ang); if (T[0] < A[0]) x.scale(1,-1);
-    x.beginPath(); x.moveTo(-.02*u, -.02*u); x.quadraticCurveTo(Lf*.45, -.026*u, Lf+.006*u, -.004*u);
-    x.quadraticCurveTo(Lf+.01*u, .01*u, Lf-.004*u, .014*u); x.lineTo(-.028*u, .02*u); x.quadraticCurveTo(-.04*u, 0, -.02*u, -.02*u); x.closePath(); x.fill();
-    x.restore();
-    void front;
-  }
-  function arm(x, s, e, gl){
-    const S = pt(s), E = pt(e), G = pt(gl);
-    x.beginPath(); x.arc(S[0], S[1], .052*u, 0, 7); x.fill();                 // deltoïde
-    muscle(x, S, E, .045*u, .031*u, .054*u, .046*u, .42, .38);                  // biceps / triceps
-    muscle(x, E, G, .032*u, .028*u, .041*u, .036*u, .3, .3);                    // avant-bras
-  }
-  function torso(x){
-    const a = pt("sF"), b = pt("sB"), c = pt("hB"), d = pt("hF"), n = pt("neck");
-    const wF = lerp(a, d, .66), wB = lerp(b, c, .66);               // taille
-    const mid = lerp(lerp(a,b,.5), lerp(d,c,.5), .5);
-    const inF = [wF[0] + (mid[0]-wF[0])*.12, wF[1]], inB = [wB[0] + (mid[0]-wB[0])*.12, wB[1]];
-    x.beginPath();
-    x.moveTo(n[0], n[1]-.012*u);
-    x.quadraticCurveTo(a[0]-.01*u, a[1]-.045*u, a[0]+.012*u, a[1]);          // trapèze
-    x.quadraticCurveTo(a[0]+.035*u, (a[1]+inF[1])*.45, inF[0], inF[1]);       // pectoral / grand dorsal (V)
-    x.quadraticCurveTo(d[0]+.012*u, (inF[1]+d[1])/2, d[0]+.01*u, d[1]);
-    x.lineTo(c[0]-.01*u, c[1]);
-    x.quadraticCurveTo(c[0]-.012*u, (inB[1]+c[1])/2, inB[0], inB[1]);
-    x.quadraticCurveTo(b[0]-.035*u, (b[1]+inB[1])*.45, b[0]-.012*u, b[1]);
-    x.quadraticCurveTo(b[0]+.01*u, b[1]-.045*u, n[0], n[1]-.012*u);
-    x.closePath(); x.fill();
-  }
-  function head(x){
-    const Hd = pt("head"), N = pt("neck");
-    muscle(x, N, Hd, .034*u, .03*u, .036*u, .036*u);                         // cou épais
-    x.beginPath(); x.ellipse(Hd[0], Hd[1]-.004*u, .043*u, .052*u, 0, 0, 7); x.fill();
-    if (P.f){ x.beginPath(); x.moveTo(Hd[0]+.02*u, Hd[1]+.01*u); x.quadraticCurveTo(Hd[0]+.05*u, Hd[1]+.02*u, Hd[0]+.035*u, Hd[1]+.045*u); x.lineTo(Hd[0]-.01*u, Hd[1]+.05*u); x.closePath(); x.fill(); }
-    else { x.beginPath(); x.moveTo(Hd[0]-.035*u, Hd[1]+.01*u); x.quadraticCurveTo(Hd[0], Hd[1]+.075*u, Hd[0]+.035*u, Hd[1]+.01*u); x.closePath(); x.fill(); }
-  }
-  function body(x){ leg(x,"hB","kB","aB","tB",false); arm(x,"sB","eB","gB"); torso(x); head(x); leg(x,"hF","kF","aF","tF",true); arm(x,"sF","eF","gF"); }
-  function glove(x, k, e){
-    const G = pt(k), E = pt(e), ang = Math.atan2(G[1]-E[1], G[0]-E[0]);
-    x.save(); x.translate(G[0], G[1]); x.rotate(ang);
-    x.beginPath(); x.ellipse(.01*u, 0, .056*u, .048*u, 0, 0, 7); x.fill();                       // poing
-    x.beginPath(); x.ellipse(-.005*u, .036*u, .026*u, .018*u, .5, 0, 7); x.fill();                 // pouce
-    x.beginPath(); x.rect(-.06*u, -.034*u, .04*u, .068*u); x.fill();                               // manchette
-    x.restore();
-  }
-  function shortsShape(x){
-    const a=pt("hB"), b=pt("hF"), k1=lerp(pt("hF"),pt("kF"),.45), k2=lerp(pt("hB"),pt("kB"),.45), mid=lerp(a,b,.5);
-    x.beginPath(); x.moveTo(a[0]-.03*u, a[1]-.04*u); x.lineTo(b[0]+.03*u, b[1]-.04*u);
-    x.quadraticCurveTo(k1[0]+.08*u, (b[1]+k1[1])/2, k1[0]+.065*u, k1[1]); x.lineTo(k1[0]-.06*u, k1[1]+.012*u);
-    x.lineTo(mid[0], mid[1]+.075*u); x.lineTo(k2[0]+.06*u, k2[1]+.012*u); x.lineTo(k2[0]-.065*u, k2[1]);
-    x.quadraticCurveTo(k2[0]-.08*u, (a[1]+k2[1])/2, a[0]-.03*u, a[1]-.04*u); x.closePath(); x.fill();
-  }
-  // 1. masque de la silhouette complète
-  function anatomy(x){
-    // volumes qui donnent un corps humain : trapèzes, pectoraux, grands dorsaux, fessiers, rotules
-    const a = pt("sF"), b = pt("sB"), c = pt("hB"), d = pt("hF"), n = pt("neck");
-    const ell = (p, rx, ry, rot=0) => { x.beginPath(); x.ellipse(p[0], p[1], rx, ry, rot, 0, 7); x.fill(); };
-    const ang = Math.atan2(c[1]-b[1], c[0]-b[0]) - Math.PI/2;
-    ell(lerp(n, lerp(a,b,.5), .55), .075*u, .035*u, Math.atan2(a[1]-b[1], a[0]-b[0]));     // trapèzes
-    ell(lerp(lerp(a,b,.5), lerp(d,c,.5), .2), .082*u, .052*u, ang);                         // cage thoracique / pectoraux
-    ell(lerp(lerp(a,b,.5), lerp(d,c,.5), .55), .05*u, .07*u, ang);                          // abdominaux
-    ell(lerp(b, c, .28), .03*u, .06*u, ang);                                                // grand dorsal
-    ell(lerp(a, d, .28), .03*u, .06*u, ang);
-    const hipC = lerp(c, d, .5); ell([hipC[0] - (P.f ? .02*u : 0), hipC[1] + .01*u], .062*u, .045*u, 0);   // bassin et fessiers
-    [["hF","kF"],["hB","kB"]].forEach(([h0,k0])=>{ const K = pt(k0); ell(K, .042*u, .036*u, 0); });           // genoux
-  }
-  // 1. masque de la silhouette : on dessine les volumes, on les floute puis on les « soude » (seuil) pour un contour organique
+  const SP = SIL[pose]; if (!SP) return;
+  const Pt = ([px,py]) => [cx + (px-.5)*h, top + py*h];
+  const body = x => drawSil(x, pose, cx, top, h, "all");
+  const shortsShape = x => { if (pose === "kick") return; x.save(); x.beginPath(); x.rect(0, top + .425*h, W, .17*h); x.clip(); x.beginPath(); x.rect(0,0,W,H);
+    // le short : la partie du corps entre la taille et le milieu des cuisses, sans les bras
+    const T = document.createElement("canvas"); T.width = W; T.height = H; const tx = T.getContext("2d"); tx.fillStyle = "#000";
+    const pts = SP.body; tx.beginPath(); pts.map(Pt).forEach(([px,py],i)=> i ? tx.lineTo(px,py) : tx.moveTo(px,py)); tx.closePath(); tx.fill();
+    x.drawImage(T, 0, 0); x.restore(); };
+  const glovesShape = x => drawSil(x, pose, cx, top, h, "gloves");
+  if (opt.bare){ g.save(); g.fillStyle = "#000"; body(g); g.restore(); return; }
+  const P = {belt: !!SP.belt};
+  const pt = k => k === "gB" ? Pt(SP.arms[1].g) : Pt(SP.arms[0].g);
   const S = .5, Mh = document.createElement("canvas"); Mh.width = W*S; Mh.height = H*S; const mh = Mh.getContext("2d");
   mh.filter = `blur(${Math.max(1.5, .0035*u*S)}px)`; mh.scale(S,S); mh.fillStyle = "#000";
-  body(mh); anatomy(mh); glove(mh,"gB","eB"); glove(mh,"gF","eF"); shortsShape(mh);
-  if (P.belt){ const L = pt("gB"), R = pt("gF"); mh.fillRect(L[0]-.02*u, L[1]-.035*u, R[0]-L[0]+.04*u, .07*u); }
+  body(mh);
   const minX = Math.max(0, Math.floor((cx - h*.6)*S)), minY = Math.max(0, Math.floor((top - h*.08)*S)), bw = Math.min(Mh.width-minX, Math.ceil(h*1.2*S)), bh = Math.min(Mh.height-minY, Math.ceil(h*1.12*S));
   if (bw > 0 && bh > 0){ const id = mh.getImageData(minX, minY, bw, bh), px = id.data;
     for (let i=3;i<px.length;i+=4){ const a = px[i]; px[i] = a > 120 ? 255 : a > 90 ? (a-90)*8.5 : 0; px[i-3] = px[i-2] = px[i-1] = 0; }
@@ -2346,17 +2322,10 @@ function drawFighter(g, pose, cx, top, h, opt={}){
   bx.globalCompositeOperation = "source-atop";
   const red = opt.gloves || "#a3191f";
   bx.fillStyle = opt.shorts || "#6d1418"; shortsShape(bx);
-  bx.fillStyle = "rgba(239,231,220,.8)"; const ha = pt("hB"), hb = pt("hF"); bx.fillRect(Math.min(ha[0],hb[0])-.03*u, Math.min(ha[1],hb[1])-.045*u, Math.abs(hb[0]-ha[0])+.06*u, .014*u);
-  bx.fillStyle = red; glove(bx,"gB","eB"); glove(bx,"gF","eF");
+  if (pose !== "kick"){ bx.fillStyle = "rgba(239,231,220,.8)"; bx.fillRect(0, top + .425*h, W, .012*h); }
+  bx.fillStyle = red; glovesShape(bx);
   if (P.belt){ const L = pt("gB"), R = pt("gF"); const bg = bx.createLinearGradient(L[0],L[1],R[0],R[1]); bg.addColorStop(0,"#7a5416"); bg.addColorStop(.5,"#f3d27a"); bg.addColorStop(1,"#7a5416");
     bx.fillStyle = "#151010"; bx.fillRect(L[0]-.02*u, L[1]-.03*u, R[0]-L[0]+.04*u, .06*u); bx.fillStyle = bg; bx.beginPath(); bx.ellipse((L[0]+R[0])/2, L[1], .07*u, .05*u, 0, 0, 7); bx.fill(); }
-  // 5. définition musculaire (très discrète)
-  bx.strokeStyle = "rgba(239,231,220,.07)"; bx.lineWidth = .004*u; bx.lineCap = "round";
-  const a = pt("sF"), b2 = pt("sB"), d = pt("hF"), c = pt("hB"), mid = lerp(lerp(a,b2,.5), lerp(d,c,.5), .5);
-  const pec = lerp(lerp(a,b2,.5), mid, .45);
-  bx.beginPath(); bx.moveTo(lerp(a,b2,.15)[0], pec[1]); bx.quadraticCurveTo(pec[0], pec[1]+.03*u, lerp(a,b2,.85)[0], pec[1]); bx.stroke();
-  bx.beginPath(); bx.moveTo(pec[0], pec[1]+.02*u); bx.lineTo(mid[0], mid[1]+.09*u); bx.stroke();
-  for (let i=1;i<=3;i++){ const y = pec[1]+.02*u + i*.045*u; bx.beginPath(); bx.moveTo(mid[0]-.035*u, y); bx.lineTo(mid[0]+.035*u, y); bx.stroke(); }
   // 6. liserés de lumière : blanc chaud venant du haut, rouge venant du côté
   function rim(dx, dy, col, blur){
     const R = mk(), r = R.getContext("2d"); r.drawImage(M,0,0); r.globalCompositeOperation = "destination-out"; r.drawImage(M, dx, dy);
@@ -2449,8 +2418,8 @@ function bgBelt(g,W,H,seed){
 
 /* ---------- Affiches éditoriales : dos, match day, grain, blanc ---------- */
 function fighterLayer(pose, cx, top, h, opt={}){
-  const c = document.createElement("canvas"); c.width = 1170; c.height = 2532;
-  drawFighter(c.getContext("2d"), pose, cx, top, h, Object.assign({glow:"rgba(0,0,0,0)"}, opt)); return c;
+  const c = document.createElement("canvas"); c.width = 1170; c.height = 2532; if (!SIL[pose]) return c; // « Aucun » : pas de personnage
+  drawFighter(c.getContext("2d"), pose, cx, top, h, Object.assign({glow:"rgba(0,0,0,0)", bare:true}, opt)); return c;
 }
 function tint(src, color){ const c = document.createElement("canvas"); c.width = src.width; c.height = src.height; const x = c.getContext("2d");
   x.drawImage(src, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c; }
@@ -2483,7 +2452,7 @@ function posterBack(g, W, H, o, seed){
   g.save(); g.translate(W*.6, H*.4); g.rotate(-Math.PI*.36); g.fillStyle = "#f2efe9"; let fs = 980; g.font = `${fs}px ${DISP}`; while (g.measureText(word).width > H*1.15 && fs > 400){ fs -= 40; g.font = `${fs}px ${DISP}`; }
   g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(word, 0, 0); g.restore();
   // combattant de dos, sombre avec liseré rouge
-  const fh = H*.62, raw = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.48, H*.36, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  const fh = H*.62, raw = fighterLayer(o.fig, W*.48, H*.36, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
   const dark = tint(raw, "#0e0c0c"), redE = tint(raw, "#d7262e"), whiteE = tint(raw, "#f2e6da");
   // silhouette sombre découpée par deux liserés de lumière (rouge à gauche, blanc à droite)
   g.save(); g.shadowColor = "rgba(0,0,0,.9)"; g.shadowBlur = 90; g.drawImage(dark, 0, 0); g.restore();
@@ -2513,7 +2482,7 @@ function posterMatch(g, W, H, o, seed){
   const bg = g.createLinearGradient(0,0,0,H); bg.addColorStop(0,"#0d1220"); bg.addColorStop(1,"#05070c"); g.fillStyle = bg; g.fillRect(0,0,W,H);
   for (let i=0;i<70;i++){ const x = r()*W, y = r()*H*.75, rr = 30 + r()*110; const b = g.createRadialGradient(x,y,0,x,y,rr); b.addColorStop(0, `rgba(${r()<.3?"215,170,110":"170,190,230"},${.05+r()*.08})`); b.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = b; g.fillRect(x-rr,y-rr,rr*2,rr*2); }
   // combattant en fond, flou et sombre comme une photo
-  const fraw = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.5, H*.2, H*.66, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  const fraw = fighterLayer(o.fig, W*.5, H*.2, H*.66, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
   g.save(); g.filter = "blur(2px)"; g.globalAlpha = .9; g.drawImage(tint(fraw, "#05070c"), 0, 0); g.globalAlpha = .5; g.drawImage(tint(fraw, "#8fa8d6"), 5, -3); g.globalAlpha = .9; g.drawImage(tint(fraw, "#0a0e18"), 0, 0); g.restore(); g.filter = "none";
   g.fillStyle = "rgba(5,7,12,.35)"; g.fillRect(0,0,W,H);
   // cadre
@@ -2554,8 +2523,9 @@ function posterGrain(g, W, H, o, seed){
   // buste flouté puis tramé
   const m = document.createElement("canvas"), sc = 3, mw = Math.ceil(W/sc), mh = Math.ceil(H/sc); m.width = mw; m.height = mh; const x = m.getContext("2d");
   x.filter = "blur(14px)"; x.fillStyle = "#000";
-  x.beginPath(); x.ellipse(mw*.5, mh*.33, mw*.2, mh*.115, 0, 0, 7); x.fill();
-  x.beginPath(); x.moveTo(mw*.42, mh*.42); x.lineTo(mw*.58, mh*.42); x.lineTo(mw*.6, mh*.5); x.quadraticCurveTo(mw*1.05, mh*.54, mw*1.08, mh*1.02); x.lineTo(-mw*.08, mh*1.02); x.quadraticCurveTo(-mw*.05, mh*.54, mw*.4, mh*.5); x.closePath(); x.fill();
+  if (!SIL[o.fig]){ x.beginPath(); for (let i=0;i<=8;i++){ const a = Math.PI/8 + i*Math.PI/4, px = mw*.5 + mw*.42*Math.cos(a), py = mh*.36 + mw*.42*Math.sin(a); i ? x.lineTo(px,py) : x.moveTo(px,py); } x.fill(); }
+  else { x.beginPath(); x.ellipse(mw*.5, mh*.33, mw*.2, mh*.115, 0, 0, 7); x.fill();
+  x.beginPath(); x.moveTo(mw*.42, mh*.42); x.lineTo(mw*.58, mh*.42); x.lineTo(mw*.6, mh*.5); x.quadraticCurveTo(mw*1.05, mh*.54, mw*1.08, mh*1.02); x.lineTo(-mw*.08, mh*1.02); x.quadraticCurveTo(-mw*.05, mh*.54, mw*.4, mh*.5); x.closePath(); x.fill(); }
   const id = x.getImageData(0,0,mw,mh).data, out = g.createImageData(W, H), od = out.data;
   const base = g.getImageData(0,0,W,H).data;
   for (let py=0; py<H; py++) for (let px=0; px<W; px++){
@@ -2601,10 +2571,10 @@ function posterWhite(g, W, H, o, seed){
   g.font = `150px ${DISP}`; g.fillText("FC", -40, 40); g.restore();
   g.font = `700 28px ${BODY}`; g.fillStyle = "#0d0c0c"; spaced(g, "FIGHT CAMP", W/2, H*.27, 18, "center");
   // combattant
-  const fh = H*.36, floor = H*.72, pose = o.fig && POSES[o.fig] ? o.fig : "garde";
+  const fh = H*.36, floor = H*.72, pose = o.fig, hasFig = !!SIL[pose];
   const fig = tint(fighterLayer(pose, W/2, floor - fh, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"}), "#0d0c0c");
   // ombre au sol
-  const sh = g.createRadialGradient(W/2, floor, 10, W/2, floor, W*.3); sh.addColorStop(0,"rgba(0,0,0,.35)"); sh.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = sh; g.save(); g.translate(W/2, floor); g.scale(1, .12); g.translate(-W/2, -floor); g.fillRect(0, floor - W*.3, W, W*.6); g.restore();
+  const sh = g.createRadialGradient(W/2, floor, 10, W/2, floor, W*.3); sh.addColorStop(0, hasFig ? "rgba(0,0,0,.35)" : "rgba(0,0,0,0)"); sh.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = sh; g.save(); g.translate(W/2, floor); g.scale(1, .12); g.translate(-W/2, -floor); g.fillRect(0, floor - W*.3, W, W*.6); g.restore();
   // reflet
   const rf = document.createElement("canvas"); rf.width = W; rf.height = H; const rx = rf.getContext("2d");
   rx.translate(0, floor*2); rx.scale(1, -1); rx.drawImage(fig, 0, 0); rx.setTransform(1,0,0,1,0,0);
@@ -2651,7 +2621,7 @@ function posterArena(g, W, H, o, seed){
   [0,1,2].forEach(k=>{ const off = 14 + k*16; g.beginPath(); ring.forEach(([x,y],i)=> i ? g.lineTo(x, y-off) : g.moveTo(x, y-off)); g.closePath(); g.stroke(); });
   ring.forEach(([x,y])=>{ g.fillStyle = "#e9eef0"; g.fillRect(x-5, y-62, 10, 62); });
   // combattant seul au centre
-  const fh = H*.075, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", rc[0], rc[1] - fh*.92, fh, {rim:"rgba(255,240,220,.9)"});
+  const fh = H*.075, f = fighterLayer(o.fig, rc[0], rc[1] - fh*.92, fh, {rim:"rgba(255,240,220,.9)"});
   g.drawImage(tint(f, "#1a1210"), 0, 0); g.save(); g.globalAlpha = .7; g.drawImage(tint(f, "#d9b8a0"), 2, -1); g.restore(); g.drawImage(tint(f, "#140e0c"), 1, 1);
   // faisceau et brume
   g.save(); g.filter = "blur(30px)"; const bm = g.createLinearGradient(0, 0, W*.5, H*.62); bm.addColorStop(0,"rgba(170,210,215,.0)"); bm.addColorStop(.35,"rgba(170,210,215,.22)"); bm.addColorStop(1,"rgba(200,230,235,.28)");
@@ -2678,7 +2648,7 @@ function posterRedCage(g, W, H, o, seed){
   g.fillStyle = "#1a0303"; g.fillRect(0, top, W, 26); [0, .2, .8, 1].forEach(k=>g.fillRect(W*k - 16, top, 32, bot-top));
   const fl = g.createLinearGradient(0, bot, 0, H); fl.addColorStop(0,"#3a0505"); fl.addColorStop(.3,"#110202"); fl.addColorStop(1,"#070101"); g.fillStyle = fl; g.fillRect(0, bot, W, H-bot);
   for (let i=0;i<60;i++){ g.fillStyle = `rgba(240,50,40,${.08 + r()*.25})`; g.beginPath(); g.ellipse(r()*W, bot + 10 + r()*60, 30 + r()*140, 4 + r()*8, 0, 0, 7); g.fill(); }
-  const fh = H*.38, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.5, bot + 8 - fh, fh);
+  const fh = H*.38, f = fighterLayer(o.fig, W*.5, bot + 8 - fh, fh);
   g.drawImage(tint(f, "#0a0202"), 0, 0);
   darkGrain(g, W, H, r, 22000, .12);
   // textes
@@ -2691,10 +2661,10 @@ function posterRedCage(g, W, H, o, seed){
 function posterBeltGlow(g, W, H, o, seed){
   const d = posterData(), r = rnd(seed);
   g.fillStyle = "#050404"; g.fillRect(0,0,W,H);
-  const fh = H*.78, cx = W*.5, top = H*.24, f = fighterLayer("champion", cx, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  const fh = H*.78, cx = W*.5, top = H*.24, f = fighterLayer(o.fig, cx, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
   g.drawImage(tint(f, "#100c0a"), 0, 0);
   g.save(); g.globalAlpha = .75; g.drawImage(tint(f, "#d9a43a"), 6, -2); g.restore(); g.drawImage(tint(f, "#0d0a08"), -2, 2);
-  const by = top + .01*fh, bw = fh*.17;
+  const hands = SIL[o.fig] && o.fig === "champion", by = hands ? top + .045*fh : SIL[o.fig] ? H*.18 : H*.5, bw = hands ? fh*.17 : SIL[o.fig] ? fh*.14 : W*.5;
   g.save(); g.shadowColor = "#ffcc55"; g.shadowBlur = 120;
   const gg = g.createLinearGradient(cx - bw, by - bw*.5, cx + bw, by + bw*.5); gg.addColorStop(0,"#fff1b0"); gg.addColorStop(.4,"#e0a63a"); gg.addColorStop(.7,"#8a5a14"); gg.addColorStop(1,"#f6d27a");
   g.fillStyle = gg; poly(g, octPts(cx, by, bw*.62, bw*.48)); g.fill(); g.restore();
@@ -2725,6 +2695,7 @@ function posterEmptyCage(g, W, H, o, seed){
   [[3,4,5,6,7,0],[0,1,2,3]].forEach((idx, back)=>{ idx.slice(0,-1).forEach((k,j)=>{ const a = base[k], b = base[idx[j+1]], A = up[k], B = up[idx[j+1]];
     g.save(); poly(g, [A, B, b, a]); g.clip(); meshFill(g, Math.min(a[0],b[0]) - 5, Math.min(A[1],B[1]), Math.max(a[0],b[0]) + 5, Math.max(a[1],b[1]), 14, back ? "rgba(20,20,20,.55)" : "rgba(160,160,160,.25)", 1.5); g.restore();
     g.strokeStyle = back ? "#111" : "#2a2a2a"; g.lineWidth = back ? 14 : 8; g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke(); }); });
+  if (SIL[o.fig]){ const fh2 = H*.11, ff = fighterLayer(o.fig, cx, cy - fh2*.95, fh2); g.drawImage(tint(ff, "#0a0a0a"), 0, 0); g.save(); g.globalAlpha = .5; g.drawImage(tint(ff, "#ffffff"), 0, -3); g.restore(); g.drawImage(tint(ff, "#0a0a0a"), 0, 1); }
   base.forEach(([x,y],k)=>{ g.fillStyle = y > cy ? "#0e0e0e" : "#2a2a2a"; g.fillRect(x - (y > cy ? 12 : 7), y - ph, y > cy ? 24 : 14, ph); });
   for (let row=0; row<4; row++) for (let i=0;i<10;i++){ const y = H*.87 + row*H*.03, x = W*(i/9.5) + (row%2)*40 - 20; g.fillStyle = `rgb(${18-row*3},${18-row*3},${18-row*3})`; g.beginPath(); g.roundRect(x, y, W*.085, H*.022, 10); g.fill(); }
   vignette(g, W, H, .6);
@@ -2742,7 +2713,7 @@ function posterCageAction(g, W, H, o, seed){
     b.addColorStop(0, red ? `rgba(220,40,40,${.12 + r()*.25})` : `rgba(90,140,255,${.15 + r()*.3})`); b.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = b; g.fillRect(x-rr,y-rr,rr*2,rr*2); }
   g.strokeStyle = "rgba(200,30,30,.45)"; g.lineWidth = 4; for (let i=0;i<14;i++){ const x = i*W/13; g.beginPath(); g.moveTo(x, H*.22); g.lineTo(x + 60, H*.26); g.lineTo(x + 120, H*.22); g.stroke(); }
   [[W*.15, H*.24, "#6fa8ff"], [W*.62, H*.25, "#6fa8ff"], [W*.85, H*.24, "#ff4040"], [W*.3, H*.31, "#ff4040"]].forEach(([x,y,c])=>{ const gl = g.createRadialGradient(x,y,0,x,y,40); gl.addColorStop(0,"#fff"); gl.addColorStop(.3,c); gl.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = gl; g.fillRect(x-40,y-40,80,80); });
-  const fh = H*.5, top = H*.3, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "victoire", W*.5, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  const fh = H*.5, top = H*.3, f = fighterLayer(o.fig, W*.5, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
   g.save(); g.shadowColor = "rgba(230,40,40,.6)"; g.shadowBlur = 50; g.drawImage(tint(f, "#1a0b0b"), 0, 0); g.restore();
   g.save(); g.globalAlpha = .85; g.drawImage(tint(f, "#ff3a32"), -7, -2); g.globalAlpha = .55; g.drawImage(tint(f, "#ffd9c0"), 5, -3); g.restore(); g.drawImage(tint(f, "#160909"), 0, 1);
   // bande de la cage
@@ -2772,7 +2743,7 @@ async function posterTriptych(g, W, H, o, seed){
     const im = imgs[i];
     if (im){ const s = Math.max(w/im.width, h/im.height); g.filter = "grayscale(35%) contrast(1.1) sepia(25%)"; g.drawImage(im, x + (w - im.width*s)/2, y + (h - im.height*s)/2, im.width*s, im.height*s); g.filter = "none"; }
     else { const bgc = g.createLinearGradient(x, y, x + w, y + h); bgc.addColorStop(0,"#3a2a22"); bgc.addColorStop(1,"#120c0a"); g.fillStyle = bgc; g.fillRect(x, y, w, h);
-      const fh = H*.62, f = fighterLayer(poses[i], x + w/2, y + h*.04, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"}); g.drawImage(tint(f, "#0e0907"), 0, 0); g.globalAlpha = .6; g.drawImage(tint(f, "#c89470"), i===2 ? -4 : 4, -2); g.globalAlpha = 1; g.drawImage(tint(f, "#140d0a"), i===2 ? 1 : -1, 1); }
+      const fh = H*.62, f = fighterLayer(SIL[o.fig] ? (o.fig === "garde" ? poses[i] : o.fig) : null, x + w/2, y + h*.04, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"}); g.drawImage(tint(f, "#0e0907"), 0, 0); g.globalAlpha = .6; g.drawImage(tint(f, "#c89470"), i===2 ? -4 : 4, -2); g.globalAlpha = 1; g.drawImage(tint(f, "#140d0a"), i===2 ? 1 : -1, 1); }
     for (let k=0;k<5000;k++){ g.fillStyle = `rgba(0,0,0,${r()*.12})`; g.fillRect(x + r()*w, y + r()*h, 2, 2); }
     g.restore(); }
   const labs = [["DÉPART", profile.startWeight ? fmt1(profile.startWeight) + " KG" : "–"], ["AUJOURD'HUI", d.cw ? fmt1(d.cw) + " KG" : "–"], ["OBJECTIF", d.goal ? fmt1(d.goal) + " KG" : "–"]];
@@ -2794,7 +2765,7 @@ function posterStripe(g, W, H, o, seed){
   g.fillStyle = "#d8d8d8"; g.fillText(a, x0, H*.39); if (b){ g.fillStyle = "#e0262f"; g.fillText("," + b, x0 + wa, H*.39); }
   g.fillStyle = "#bbb"; g.fillRect(W/2 - 30, H*.415, 60, 3);
   g.font = `700 26px ${BODY}`; g.fillStyle = "rgba(220,220,220,.7)"; spaced(g, d.dd !== null ? `KG  ·  OBJECTIF  ·  J-${d.dd}` : "KG  ·  OBJECTIF", W/2, H*.45, 10, "center");
-  const floor = H*.9, fh = H*.5, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.66, floor - fh, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  const floor = H*.9, fh = H*.5, f = fighterLayer(o.fig, W*(["jab","kick"].includes(o.fig) ? .5 : .66), floor - fh, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
   g.save(); g.globalAlpha = .9; g.drawImage(tint(f, "#ff2a2a"), -6, -1); g.restore(); g.drawImage(tint(f, "#121212"), 0, 0);
   const sh = document.createElement("canvas"); sh.width = W; sh.height = H; const x = sh.getContext("2d"); x.drawImage(f, 0, 0); x.globalCompositeOperation = "source-in";
   const lg = x.createLinearGradient(W*.4, 0, W*.9, 0); lg.addColorStop(0,"rgba(80,80,80,.35)"); lg.addColorStop(.5,"rgba(0,0,0,0)"); x.fillStyle = lg; x.fillRect(0,0,W,H); g.drawImage(sh, 0, 0);
@@ -2912,7 +2883,7 @@ const PRESETS = () => [
   ["Affiche · Discipline",{mode:"quote",bg:"back",fig:"victoire",word:0}],
   ["Match day",{mode:"quote",bg:"match",fig:"garde"}],
   ["Match day · Jab",{mode:"quote",bg:"match",fig:"jab"}],
-  ["Grain",{mode:"quote",bg:"grain",fig:"none"}],
+  ["Grain",{mode:"quote",bg:"grain",fig:"garde"}],
   ["Blanc · Objectif",{mode:"goal",bg:"white",fig:"garde"}],
   ["Blanc · High kick",{mode:"count",bg:"white",fig:"kick"}],
   ["Arène",{mode:"quote",bg:"arena",fig:"garde"}],
@@ -2922,7 +2893,7 @@ const PRESETS = () => [
   ["Octogone vide",{mode:"count",bg:"emptycage",fig:"none"}],
   ["Cage en action",{mode:"quote",bg:"cageaction",fig:"victoire"}],
   ["Cage · High kick",{mode:"quote",bg:"cageaction",fig:"kick"}],
-  ["Triptyque",{mode:"tape",bg:"triptych",fig:"none"}],
+  ["Triptyque",{mode:"tape",bg:"triptych",fig:"garde"}],
   ["Bande rouge",{mode:"goal",bg:"stripe",fig:"garde"}],
   ["Bande rouge · Jab",{mode:"goal",bg:"stripe",fig:"jab"}]
 ].map(([nom,o],i)=>({id:"p"+i, nom, o:Object.assign({seed:11+i*7}, o)}));
