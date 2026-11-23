@@ -547,6 +547,7 @@ async function pullAll(){
   await pushState();
   render();
   if (!profile.notifSyncedAt || Date.now() - profile.notifSyncedAt > 6*3600e3) syncNotifs();
+  setTimeout(autoLock, 600);
   if (profile.dailyWall && profile.dailyWall.on && Date.now() - (profile.dailyWall.at||0) > 12*3600e3) setTimeout(()=>prepareDailyWalls(false), 4000);
 }
 async function initStore(){
@@ -2514,6 +2515,14 @@ async function fetchServerTasks(){
   catch(e){ serverTasks = null; }
   if (document.getElementById("lock")) paintLock();
 }
+// À chaque ouverture de l'app : si une tâche bloque, on affiche directement l'écran de blocage
+async function autoLock(){
+  if (!profile.lockOn || !store.uid || document.getElementById("defi")) return;
+  await fetchServerTasks();
+  const d = day(), pend = (serverTasks||[]).filter(t => t.kind==="defi" ? !(d.defis||[]).some(x=>x.key===t.key) : !d.meals.some(m=>m.type===t.ty));
+  if ((pend.length || pendingTasks().length) && !document.getElementById("lock")) openLock();
+}
+document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible") setTimeout(autoLock, 400); });
 function openLock(){
   let el = document.getElementById("lock"); if (!el){ el = document.createElement("div"); el.id = "lock"; el.className = "player"; document.body.appendChild(el); }
   paintLock(); if (store.uid) fetchServerTasks();
