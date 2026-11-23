@@ -756,14 +756,19 @@ async function aiJson(prompt, opts={}){
   for (const b of (opts.images||[])) content.push({type:"image", source:{type:"base64", media_type:"image/jpeg", data: await blobToB64(b)}});
   content.push({type:"text", text: prompt + "\n\nRéponds uniquement avec le JSON demandé, sans aucun texte autour."});
   const messages = [{role:"user", content}];
-  const tools = opts.tools || null;
-  const apiTools = tools ? tools.map(t=>({name:t.name, description:t.description, input_schema:t.inputSchema})) : undefined;
+  const tools = opts.tools || null, out = opts.output || null;
+  let apiTools = tools ? tools.map(t=>({name:t.name, description:t.description, input_schema:t.inputSchema})) : [];
+  if (out) apiTools.push({name:out.name, description:out.description, input_schema:out.schema});
+  if (!apiTools.length) apiTools = undefined;
   for (let round=0; round<4; round++){
     const last = round===3;
-    const r = await callEdge({model: opts.model || MODEL_ECO, max_tokens: opts.max_tokens || 4000, messages, tools: apiTools, tool_choice: apiTools && last ? {type:"none"} : undefined}, opts.signal);
+    // Avec un outil de sortie, le modèle doit toujours appeler un outil : pas de texte libre, donc pas de réponse illisible
+    const choice = out ? (last ? {type:"tool", name:out.name} : {type:"any"}) : (apiTools && last ? {type:"none"} : undefined);
+    const r = await callEdge({model: opts.model || MODEL_ECO, max_tokens: opts.max_tokens || 4000, messages, tools: apiTools, tool_choice: choice}, opts.signal);
     trackUsage(opts.model || MODEL_ECO, r.usage, opts.feat);
     messages.push({role:"assistant", content:r.content});
     const uses = (r.content||[]).filter(c=>c.type==="tool_use");
+    if (out){ const o = uses.find(u=>u.name===out.name); if (o && o.input && typeof o.input === "object") return o.input; if (r.stop_reason==="max_tokens") throw {code:"invalid_json"}; }
     if (!tools || !uses.length || r.stop_reason!=="tool_use"){
       const text = (r.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n");
       if (!text.trim()) throw {code:"empty_completion"};
@@ -771,7 +776,7 @@ async function aiJson(prompt, opts={}){
       catch(e){ const s = opts.salvage && salvageList(text, opts.salvage); if (s) return s; throw e; }
     }
     const results = [];
-    for (const u of uses){
+    for (const u of uses.filter(u=>!out || u.name!==out.name)){
       const t = tools.find(x=>x.name===u.name); let out;
       try{ out = JSON.stringify(await t.execute(u.input||{}, {signal:opts.signal})); }catch(e){ out = "Error: " + (e && e.message || e); }
       results.push({type:"tool_result", tool_use_id:u.id, content:out});
@@ -1150,6 +1155,10 @@ Réponds uniquement avec ce JSON :
   }catch(e){ ai.err = aiErr(e); }
   ai.busy = false; render();
 }
+const PLAN_OUT = {name:"rendre_planning", description:"Rend les repas de la journée, prêts à afficher.", schema:{type:"object", required:["repas"], properties:{repas:{type:"array", items:{type:"object", required:["type","nom","items","etapes"], properties:{
+  type:{type:"string", description:"Petit-déjeuner, Déjeuner, Collation, Dîner…"}, nom:{type:"string"}, pourquoi:{type:"string", description:"12 mots maximum"}, temps_min:{type:"integer"},
+  items:{type:"array", maxItems:8, items:{type:"object", required:["code","g"], properties:{code:{type:"integer", description:"code Ciqual"}, label:{type:"string"}, g:{type:"number", description:"grammes crus"}}}},
+  etapes:{type:"array", maxItems:5, items:{type:"string"}}, astuce:{type:"string"}, video:{type:"string", description:"3 à 6 mots-clés de recherche YouTube"}}}}}}};
 async function planDay(dk, avoidNames, signal){
   const f = foodProfile();
   const types = f.mealsPerDay>=5 ? ["Petit-déjeuner","Déjeuner","Collation","Dîner","Collation du soir"] : f.mealsPerDay==4 ? ["Petit-déjeuner","Déjeuner","Collation","Dîner"] : ["Petit-déjeuner","Déjeuner","Dîner"];
@@ -1164,10 +1173,9 @@ ${ui.fridge ? "À utiliser si possible : " + ui.fridge.slice(0,300) + "\n" : ""}
 Le TOTAL de la journée doit viser les objectifs du jour (±5 % en calories, protéines atteintes).
 Sois concis pour que la réponse tienne : "pourquoi" en 12 mots maximum, 3 à 5 étapes de 20 mots maximum, 8 ingrédients maximum par repas, JSON compact sans retours à la ligne.
 ${CHEF_RULES}
-Réponds uniquement avec ce JSON :
-{"repas":[{"type":"${types[0]}","nom":"nom appétissant","pourquoi":"une phrase","temps_min":15,"items":[{"code":12345,"label":"ingrédient","g":150}],"etapes":["étape courte"],"astuce":"astuce de chef","video":"mots-clés"}]}`;
+N'écris aucun calcul ni aucun texte : appelle chercher_ciqual (une seule fois, avec tous les ingrédients), puis rends la journée avec l'outil rendre_planning. Un repas par élément de "repas", dans l'ordre : ${types.join(", ")}.`;
   await loadCiqual();
-  const r = await sampleFn.json(prompt, {tools:[ciqTool], signal, max_tokens:10000, feat:"planning", salvage:"repas"});
+  const r = await sampleFn.json(prompt, {tools:[ciqTool], output: PLAN_OUT, signal, max_tokens:8000, feat:"planning", salvage:"repas"});
   return (r && Array.isArray(r.repas) ? r.repas : []).map(cleanDish).filter(p=>p.items.length);
 }
 async function runPlanner(nDays){
