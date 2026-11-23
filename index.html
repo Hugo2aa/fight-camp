@@ -35,8 +35,8 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-html{background:var(--ink);overflow-x:hidden}
-body{overflow-x:hidden;overscroll-behavior-y:none}
+html{background:var(--ink);overflow-x:clip}
+body{overflow-x:clip;overscroll-behavior-y:none}
 body{background:var(--ink);color:var(--bone);font-family:var(--body);font-size:17px;line-height:1.4;-webkit-font-smoothing:antialiased}
 #app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;max-width:560px;margin:0 auto;position:relative}
 header{position:sticky;top:0;z-index:20;padding:calc(env(safe-area-inset-top) + 12px) 16px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);background:var(--ink)}
@@ -199,6 +199,9 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .steps i.d{background:var(--red)} .steps i.c{background:var(--gold)}
 .wp{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start}
 .wp img{width:150px;aspect-ratio:1170/2532;object-fit:cover;border-radius:14px;border:2px solid var(--line);display:block}
+.wp > img, .wp > div:first-child{position:sticky;top:calc(var(--hh,70px) + 12px);z-index:2;box-shadow:0 12px 30px rgba(0,0,0,.55)}
+.wp .chips{gap:6px}
+.wp .chip{padding:6px 10px;font-size:13px}
 @media (max-width:380px){.wp{grid-template-columns:120px 1fr}.wp img{width:120px}}
 .stp{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
 .stp:last-child{border-bottom:0}
