@@ -2514,7 +2514,7 @@ function modeContent(o, d){
   if (m === "all") return {m, all:true, kicker:"", title:"", sub:""};
   if (m === "word"){ const w = WORDS[(o.word||0) % WORDS.length]; return {m, kicker:"", title:w[0], sub:w[1]}; }
   if (m === "goal") return {m, kicker:"Objectif" + (profile.weightClass ? " · " + profile.weightClass : ""), title: d.goal ? fmt1(d.goal) + " KG" : "-- KG",
-    sub: [d.cw && d.goal ? fmt1(Math.max(0, d.cw - d.goal)) + " kg à perdre" : "", d.dd !== null ? "J-" + d.dd : ""].filter(Boolean).join("  ·  ")};
+    sub: [d.cw && d.goal ? fmt1(Math.max(0, d.cw - d.goal)) + " kg à perdre" : "", d.dd !== null && !o.noDate ? "J-" + d.dd : ""].filter(Boolean).join("  ·  ")};
   if (m === "count") return {m, kicker:"Avant la pesée", title: d.dd !== null ? "J-" + d.dd : "J-?",
     sub: profile.goalDate ? parseKey(profile.goalDate).toLocaleDateString("fr-FR",{weekday:"long", day:"numeric", month:"long"}) : "Choisis ta date objectif"};
   if (m === "tape") return {m, kicker:"Fiche du combattant", rows:[["Départ", profile.startWeight ? fmt1(profile.startWeight) + " kg" : "–"], ["Aujourd'hui", d.cw ? fmt1(d.cw) + " kg" : "–"], ["Objectif", d.goal ? fmt1(d.goal) + " kg" : "–"], ["Série", streak() + (streak() > 1 ? " jours" : " jour")]]};
@@ -2526,8 +2526,8 @@ function allBlock(g, o, x, y0, w, h, col){
   const cw = currentWeight(), goal = profile.goalWeight, st = streak();
   const dd = profile.goalDate ? Math.max(0, Math.ceil((parseKey(profile.goalDate)-parseKey(wdk()))/864e5)) : null;
   const q = wallQuote(o), wd = WORDS[(o.word||0) % WORDS.length];
-  const tiles = [[dd !== null ? "J-" + dd : "J-?", "avant la pesée"], [goal ? fmt1(goal) : "--", "kg objectif"], [cw && goal ? fmt1(Math.max(0, cw - goal)) : "--", "kg à perdre"]];
-  const fiche = [["Départ", profile.startWeight ? fmt1(profile.startWeight) + " kg" : "–"], ["Aujourd'hui", cw ? fmt1(cw) + " kg" : "–"], ["Série", st + (st > 1 ? " jours" : " jour")]];
+  const tiles = [o.noDate ? [String(st), st > 1 ? "jours de série" : "jour de série"] : [dd !== null ? "J-" + dd : "J-?", "avant la pesée"], [goal ? fmt1(goal) : "--", "kg objectif"], [cw && goal ? fmt1(Math.max(0, cw - goal)) : "--", "kg à perdre"]];
+  const fiche = [["Départ", profile.startWeight ? fmt1(profile.startWeight) + " kg" : "–"], ["Aujourd'hui", cw ? fmt1(cw) + " kg" : "–"], o.noDate ? ["Catégorie", profile.weightClass || "–"] : ["Série", st + (st > 1 ? " jours" : " jour")]];
   const tileH = 178*s, ficheH = 64*s, wordH = 78*s, authH = 46*s;
   let showWord = true, showFiche = true, qRoom = h - tileH - gap*3 - ficheH - wordH - authH;
   if (qRoom < 150*s){ showWord = false; qRoom += wordH + gap; } if (qRoom < 120*s){ showFiche = false; qRoom += ficheH + gap; }
@@ -2980,7 +2980,7 @@ async function makeWallpaper(o, scale=1){
     g.font = `700 48px ${BODY}`; g.fillStyle = "#d7262e"; g.fillText(("Objectif" + (profile.weightClass?" · "+profile.weightClass:"")).toUpperCase(), L, yNum - size*.95 - 18);
     g.font = `${size}px ${DISP}`; g.fillStyle = ink; g.fillText(num, L, yNum);
     g.font = `${Math.round(size*.26)}px ${DISP}`; g.fillStyle = sub; g.fillText("KG", L + nw + 18, yNum);
-    const facts = []; if (cw && goal) facts.push(`${fmt1(Math.max(0,cw-goal))} kg à perdre`); if (dd!==null && dd>=0) facts.push(`J-${dd}`);
+    const facts = []; if (cw && goal) facts.push(`${fmt1(Math.max(0,cw-goal))} kg à perdre`); if (dd!==null && dd>=0 && !o.noDate) facts.push(`J-${dd}`);
     let x = L, y = yNum + 92; g.font = `700 46px ${BODY}`;
     facts.forEach(f=>{ const w = g.measureText(f).width + 44; g.fillStyle = light ? "rgba(0,0,0,.08)" : "rgba(239,231,220,.1)"; g.beginPath(); g.roundRect(x, y-50, w, 70, 35); g.fill(); g.fillStyle = ink; g.fillText(f, x+22, y); x += w + 16; });
     g.font = `600 48px ${BODY}`; g.fillStyle = mute; g.fillText("La faim passe. La pesée reste.", L, y + (fig?100:130));
@@ -3112,6 +3112,44 @@ async function prepareDailyWalls(force){
   }catch(e){ dw.msg = "Préparation impossible. Vérifie ta connexion et réessaie."; }
   dw.busy = false; paintDW(); void today;
 }
+/* Série pour la rotation de photos intégrée à l'iPhone (écran verrouillé « Photos aléatoires ») : sans Raccourcis.
+   iOS choisit lui-même la photo du jour, dans le désordre : on n'y met donc que des textes sans date. */
+const ser = {busy:false, files:null, msg:""};
+const SER_ROT = ["quote","all","word","quote","goal","quote","all","quote","word","quote","tape","all","quote","word","quote"];
+async function makeSeries(){
+  if (ser.busy) return; ser.busy = true; ser.files = null; ser.msg = "Préparation de ta série…"; render();
+  const d = profile.dailyWall || {}, base = d.base || wallBase(), qs = allQuotes(), start = dayNum(dkey()), files = [];
+  try{
+    for (let i=0;i<SER_ROT.length;i++){
+      ser.msg = `Fond ${i+1}/${SER_ROT.length}…`; const st = document.getElementById("serStat"); if (st) st.textContent = ser.msg;
+      const o = Object.assign({}, base, {mode: d.text === "all" ? "all" : SER_ROT[i], noDate:true, qi: ((start + i) % qs.length + qs.length) % qs.length, word: i % WORDS.length, seed: base.seed ?? 11, jpeg:true});
+      const b = await makeWallpaper(o); if (b) files.push(new File([b], `fight-camp-${String(i+1).padStart(2,"0")}.jpg`, {type:"image/jpeg"}));
+      await new Promise(r=>setTimeout(r, 0));
+    }
+    ser.files = files; ser.msg = files.length ? `${files.length} fonds prêts.` : "Préparation impossible.";
+  }catch(e){ ser.msg = "Préparation impossible. Réessaie."; }
+  ser.busy = false; render(); document.getElementById("serBox")?.scrollIntoView({behavior:"smooth", block:"center"});
+}
+async function saveSeries(){
+  const files = ser.files; if (!files || !files.length) return;
+  if (navigator.canShare && navigator.canShare({files})){ try{ await navigator.share({files}); ser.msg = "Enregistrées. Fais maintenant les étapes ci-dessous."; render(); return; }catch(e){ if (e && e.name === "AbortError") return; } }
+  for (const f of files){ const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); await new Promise(r=>setTimeout(r, 300)); }
+}
+function seriesHTML(){
+  return `<div id="serBox" style="display:flex;flex-direction:column;gap:8px">
+    <h3>Sans Raccourcis : la rotation intégrée à l'iPhone</h3>
+    <p class="small muted" style="margin:0">Fight Camp crée ${SER_ROT.length} fonds sur ton fond gardé, avec des citations différentes, des mots forts, ton objectif et ta fiche. L'iPhone les fait tourner tout seul, chaque jour.</p>
+    ${ser.files ? `<button class="btn red" data-act="serSave">Enregistrer les ${ser.files.length} fonds dans Photos</button>` : `<button class="btn" data-act="serMake" ${ser.busy?"disabled":""}>Créer ma série de ${SER_ROT.length} fonds</button>`}
+    <div class="small" id="serStat" style="color:var(--ok)">${esc(ser.msg)}</div>
+    <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px">
+      <li>Touche « Enregistrer », puis <b>« Enregistrer ${SER_ROT.length} images »</b>.</li>
+      <li>Sur l'écran verrouillé, fais un <b>appui long</b> › <b>+</b> › <b>Photos aléatoires</b>.</li>
+      <li>Choisis <b>« Sélectionner manuellement »</b> et coche les ${SER_ROT.length} fonds Fight Camp (les plus récents dans Photos).</li>
+      <li>Règle la fréquence sur <b>« Tous les jours »</b>, puis Ajouter.</li>
+    </ol>
+    <p class="small muted" style="margin:0">L'iPhone mélange les photos lui-même : la série ne contient donc pas de compte à rebours daté. Quand ton poids change beaucoup, recrée la série pour mettre ta fiche à jour.</p>
+  </div>`;
+}
 // tout ce qui change le contenu des fonds : si ça bouge, on refait les 14 jours
 function dwSig(){ const d = profile.dailyWall || {}; return {k: d.keep !== false, b: d.base || null, t: d.text || "mix", cw: currentWeight(), g: profile.goalWeight, gd: profile.goalDate, sw: profile.startWeight, wc: profile.weightClass, st: streak(), v: 2}; }
 function wallBase(){ const b = {bg: wall.bg, fig: wall.fig, seed: wall.seed ?? 11};
@@ -3126,12 +3164,14 @@ function dailyWallHTML(){
   return `<section class="card ${on?"":"hi"}" id="dailyWall">
     <span class="kicker">Nouveau chaque jour</span>
     <h2>Fond d'écran automatique</h2>
-    <p class="small muted" style="margin:0">Chaque matin, ton iPhone change tout seul de fond d'écran : ton fond reste le même, seuls la citation et les infos changent (ou, si tu préfères, le fond varie aussi, avec tes photos${profile.photos.length?` (${profile.photos.length} dans ton mur)`:""}). Fight Camp prépare 14 jours d'avance et complète quand tu ouvres l'app.</p>
+    <p class="small muted" style="margin:0">Ton fond reste le même, seuls la citation et les infos changent chaque jour (ou, si tu préfères, le fond varie aussi, avec tes photos${profile.photos.length?` (${profile.photos.length} dans ton mur)`:""}).</p>
     ${(()=>{ const d = profile.dailyWall || {}, keep = d.keep !== false, b = d.base;
       return `<h3>Fond</h3><div class="chips"><button class="chip ${keep?"on":""}" data-act="dwKeep" data-v="1">Garder mon fond</button><button class="chip ${keep?"":"on"}" data-act="dwKeep" data-v="0">Varier chaque jour</button></div>
       ${keep ? `<div class="small muted">${b ? `Fond gardé : <b style="color:var(--gold)">${esc(bgName(b.bg))}</b>${b.fig && b.fig !== "none" ? " · " + esc((FIGS.find(x=>x[0]===b.fig)||[,""])[1]) : ""}. ` : "Aucun fond choisi pour l'instant. "}Choisis-le dans « Ton écran de verrouillage » puis touche « Garder ce fond chaque jour ».</div>` : ""}
       <h3>Texte chaque jour</h3><div class="chips"><button class="chip ${d.text==="all"?"on":""}" data-act="dwText" data-v="all">Tout en un</button><button class="chip ${d.text!=="all"?"on":""}" data-act="dwText" data-v="mix">Alterner les fonctions</button></div>
       <div class="small muted">${d.text==="all" ? "Chaque jour : nouvelle citation + compte à rebours, objectif, kilos à perdre, fiche et mot du jour." : "Chaque jour une fonction différente : citation, tout en un, objectif, compte à rebours, mot fort, fiche. Nouvelle citation à chaque fois."}</div>`; })()}
+    ${seriesHTML()}
+    <details${on ? " open" : ""}><summary class="small"><b>Autre méthode, avec Raccourcis</b> <span class="muted">· fond exact du jour avec J-x</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
     <button class="btn ${on?"":"red"}" data-act="dwPrepare" ${dw.busy?"disabled":""}>${on?"Régénérer mes 14 prochains fonds":"Activer le fond d'écran automatique"}</button>
     <div id="dwStat"></div>
     ${on && link ? `
@@ -3144,6 +3184,7 @@ function dailyWallHTML(){
         <li>Pour vérifier tout de suite, touche ▶︎ en bas de l'automatisation.</li>
       </ol>
       <p class="small muted" style="margin:0">Garde ce lien pour toi : il donne accès à tes fonds d'écran. La première fois, iOS te demande de choisir un fond d'écran existant : crée-en un avec n'importe quelle image Fight Camp ci-dessus.</p>` : ""}
+    </div></details>
   </section>`;
 }
 
@@ -4638,6 +4679,8 @@ document.addEventListener("click", async e=>{
     case "dwPrepare": if (!(profile.dailyWall && profile.dailyWall.base)) profile.dailyWall = Object.assign({}, profile.dailyWall||{}, {base: wallBase()}); prepareDailyWalls(true); break;
     case "dwKeep": profile.dailyWall = Object.assign({}, profile.dailyWall||{}, {keep: b.dataset.v === "1"}); if (b.dataset.v === "1" && !profile.dailyWall.base) profile.dailyWall.base = wallBase(); saveProfile(); render(); if (profile.dailyWall.on) prepareDailyWalls(true); break;
     case "dwText": profile.dailyWall = Object.assign({}, profile.dailyWall||{}, {text: b.dataset.v}); saveProfile(); render(); if (profile.dailyWall.on) prepareDailyWalls(true); break;
+    case "serMake": makeSeries(); break;
+    case "serSave": saveSeries(); break;
     case "dwUseThis": profile.dailyWall = Object.assign({}, profile.dailyWall||{}, {keep:true, base: wallBase()}); saveProfile(); render();
       if (profile.dailyWall.on){ toast("Ce fond sera gardé : seul le texte changera chaque jour"); prepareDailyWalls(true); } else { toast("Fond gardé. Active le fond automatique juste en dessous."); document.getElementById("dailyWall")?.scrollIntoView({behavior:"smooth", block:"start"}); } break;
     case "dwCopy": { const t = await wallToken().catch(()=>null); if (!t) return; try{ await navigator.clipboard.writeText(WALL_FN + t); toast("Lien copié"); }catch(err){ toast("Copie refusée"); } break; }
