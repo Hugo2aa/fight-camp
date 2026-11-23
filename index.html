@@ -3547,6 +3547,56 @@ function fxInit(){
 }
 const arenaFxOk = () => career().arenaFx !== false && (!!navigator.audioSession || !/iPhone|iPad|iPod/.test(navigator.userAgent));
 function fxNoise(buf){ const s = fx.ctx.createBufferSource(); s.buffer = buf || fx.noise; s.loop = true; s.loopStart = Math.random()*2; return s; }
+// Foule pré-enregistrée par l'app (une fois) : des centaines de voix synthétiques qui parlent, crient, applaudissent.
+// Rendu hors temps réel, puis joué en boucle sans couture : bien plus naturel qu'un bruit filtré.
+let crowdBufsP = null;
+function crowdRender(){
+  if (crowdBufsP) return crowdBufsP;
+  const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OC) return (crowdBufsP = Promise.resolve(null));
+  const sr = 22050, T = 9, LOOP = 8, X = 1;
+  const VOW = [[730,1090,2440],[270,2290,3010],[300,870,2240],[530,1840,2480],[570,840,2410],[440,1020,2240],[660,1720,2410],[490,1350,1690]];
+  const R = Math.random;
+  const noiseBuf = oc => { const b = oc.createBuffer(1, sr*2, sr), d = b.getChannelData(0); for (let i=0;i<d.length;i++) d[i] = R()*2-1; return b; };
+  function voice(oc, dest, o){
+    const osc = oc.createOscillator(); osc.type = "sawtooth"; const pre = oc.createGain(); pre.gain.value = 0; osc.connect(pre);
+    const out = oc.createGain(); out.gain.value = o.gain; const lp = oc.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = o.lp;
+    const pan = oc.createStereoPanner(); pan.pan.value = R()*1.8 - .9;
+    const fs = [0,1,2].map(k=>{ const f = oc.createBiquadFilter(); f.type = "bandpass"; f.Q.value = [6, 9, 11][k]; const fg = oc.createGain(); fg.gain.value = [1, .55, .22][k]; pre.connect(f); f.connect(fg); fg.connect(lp); return f; });
+    lp.connect(out); out.connect(pan); pan.connect(dest);
+    if (o.vib){ const v = oc.createOscillator(), vg = oc.createGain(); v.frequency.value = 4.5 + R()*2; vg.gain.value = o.f0*.025; v.connect(vg); vg.connect(osc.frequency); v.start(); }
+    let t = R()*1.2; osc.frequency.setValueAtTime(o.f0, 0);
+    while (t < T){
+      const n = o.cheer ? 1 : 2 + Math.floor(R()*6);
+      for (let k=0; k<n && t < T; k++){
+        const d = o.cheer ? .5 + R()*1.8 : .09 + R()*.17, v = VOW[Math.floor(R()*VOW.length)], f0 = o.f0*(o.cheer ? 1 + R()*.25 : .9 + R()*.25), pk = o.cheer ? .9 : .5 + R()*.5;
+        fs.forEach((f, j)=>{ f.frequency.setValueAtTime(f.frequency.value || v[j], t); f.frequency.linearRampToValueAtTime(v[j]*(o.cheer ? 1.08 : 1), t + Math.min(.05, d*.4)); });
+        osc.frequency.linearRampToValueAtTime(f0, t + d*.3); if (o.cheer) osc.frequency.linearRampToValueAtTime(f0*(R() < .5 ? 1.12 : .85), t + d);
+        pre.gain.setValueAtTime(0, t); pre.gain.linearRampToValueAtTime(pk, t + (o.cheer ? d*.25 : .025)); pre.gain.setValueAtTime(pk*(o.cheer ? .95 : .8), t + d*.7); pre.gain.linearRampToValueAtTime(0, t + d);
+        t += d + (o.cheer ? R()*.3 : R()*.05);
+      }
+      t += o.cheer ? .1 + R()*.8 : .25 + R()*1.3;
+    }
+    osc.start(0); osc.stop(T);
+  }
+  function seamless(buf){ const L = LOOP*sr, x = X*sr, out = new AudioBuffer({length:L, numberOfChannels:2, sampleRate:sr}); let peak = 0;
+    for (let ch=0; ch<2; ch++){ const a = buf.getChannelData(ch), o = out.getChannelData(ch);
+      for (let i=0;i<L;i++) o[i] = i < x ? a[i]*(i/x) + a[L+i]*(1 - i/x) : a[i]; for (let i=0;i<L;i++) peak = Math.max(peak, Math.abs(o[i])); }
+    const k = peak ? .85/peak : 1; for (let ch=0; ch<2; ch++){ const o = out.getChannelData(ch); for (let i=0;i<L;i++) o[i] *= k; } return out; }
+  const job = (fill) => { const oc = new OC(2, sr*T, sr); fill(oc); return oc.startRendering().then(seamless); };
+  crowdBufsP = Promise.all([
+    job(oc=>{ for (let i=0;i<110;i++){ const m = R() < .62; voice(oc, oc.destination, {f0: m ? 95 + R()*55 : 180 + R()*70, gain:.05 + R()*.05, lp:1800 + R()*1800}); } }),
+    job(oc=>{ for (let i=0;i<130;i++){ const m = R() < .65; voice(oc, oc.destination, {f0: m ? 170 + R()*110 : 300 + R()*140, gain:.04 + R()*.05, lp:2200 + R()*2400, cheer:true, vib:R() < .5}); } }),
+    job(oc=>{ const nb = noiseBuf(oc); for (let i=0;i<1700;i++){ const t = R()*T, s = oc.createBufferSource(); s.buffer = nb; const bp = oc.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 700 + R()*2200; bp.Q.value = .9 + R();
+        const gg = oc.createGain(), a = .15 + R()*.5; gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(a, t + .0015); gg.gain.exponentialRampToValueAtTime(.001, t + .02 + R()*.03);
+        const pn = oc.createStereoPanner(); pn.pan.value = R()*1.8 - .9; s.connect(bp); bp.connect(gg); gg.connect(pn); pn.connect(oc.destination); s.start(t, R()*1.5); s.stop(t + .07); } })
+  ]).then(([talk, cheer, claps])=>({talk, cheer, claps})).catch(()=>null);
+  return crowdBufsP;
+}
+function attachCrowdBufs(b){
+  if (!b || !fx.ctx || !fx.crowd || fx.crowdLayers) return; const c = fx.ctx;
+  fx.crowdLayers = ["talk","cheer","claps"].map(k=>{ const s = c.createBufferSource(); s.buffer = b[k]; s.loop = true; const g = c.createGain(); g.gain.value = 0; s.connect(g); g.connect(fx.crowd); s.start(0, Math.random()*7); return g; });
+  if (fx.babble) fx.babble.gain.setTargetAtTime(.12, c.currentTime, 1.5);
+}
 // Public : rumeur grave, brouhaha de voix, applaudissements et sifflets épars, le tout dans la réverbération de la salle
 function crowdStart(){
   if (!fx.ctx || fx.crowd) return; const c = fx.ctx;
@@ -3556,15 +3606,19 @@ function crowdStart(){
   // rumeur
   const r = fxNoise(fx.noise), rl = c.createBiquadFilter(); rl.type = "lowpass"; rl.frequency.value = 380; const rg = c.createGain(); rg.gain.value = .55; r.connect(rl); rl.connect(rg); rg.connect(g); r.start();
   // brouhaha : bandes de formants modulées lentement (comme des milliers de voix)
+  const babble = c.createGain(); babble.gain.value = 1; babble.connect(g); fx.babble = babble;
   [[420, 3, .5, .13], [850, 3.5, .45, .21], [1350, 4, .3, .17], [2300, 5, .14, .29]].forEach(([f, q, a, rate], i)=>{ const n = fxNoise(fx.pink), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q;
     const vg = c.createGain(); vg.gain.value = a; const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = rate; lg.gain.value = a*.35; lfo.connect(lg); lg.connect(vg.gain);
-    const pan = c.createStereoPanner ? c.createStereoPanner() : null; n.connect(bp); bp.connect(vg); if (pan){ pan.pan.value = [-.4, .4, -.2, .2][i]; vg.connect(pan); pan.connect(g); } else vg.connect(g); n.start(); lfo.start(); });
-  fx.crowd = g; fx.crowdDuck = duck; crowdLevel(.28, 2);
+    const pan = c.createStereoPanner ? c.createStereoPanner() : null; n.connect(bp); bp.connect(vg); if (pan){ pan.pan.value = [-.4, .4, -.2, .2][i]; vg.connect(pan); pan.connect(babble); } else vg.connect(babble); n.start(); lfo.start(); });
+  fx.crowd = g; fx.crowdDuck = duck; fx.crowdLayers = null; crowdLevel(.28, 2);
+  crowdRender().then(attachCrowdBufs);
   // évènements : applaudissements (plus denses quand le public s'enflamme), cris et sifflets rares
   const tick = () => { if (!fx.ctx || fx.crowd !== g) return; const lvl = g.gain.value, n = c.currentTime;
-    const claps = Math.round(lvl*lvl*26); for (let i=0;i<claps;i++) clapAt(n + Math.random()*.25, .03 + Math.random()*.05*lvl, g);
-    if (lvl > .35 && Math.random() < lvl*.18) whistleAt(n + Math.random()*.2, .05 + lvl*.06, g);
-    if (Math.random() < .08 + lvl*.15) shoutAt(n + Math.random()*.2, .05 + lvl*.08, g);
+    const L = fx.crowdLayers;
+    if (L){ // la foule change de nature avec son intensité : elle discute, puis crie, puis applaudit
+      const v = Math.min(1.2, lvl/.55); L[0].gain.setTargetAtTime(1.6*(1 - Math.min(.6, v*.5)), n, .4); L[1].gain.setTargetAtTime(Math.max(0, (v - .3))*1.4, n, .3); L[2].gain.setTargetAtTime(Math.pow(Math.max(0, v - .35), 1.3)*1.1, n, .3); }
+    else { const claps = Math.round(lvl*lvl*26); for (let i=0;i<claps;i++) clapAt(n + Math.random()*.25, .03 + Math.random()*.05*lvl, g); }
+    if (lvl > .45 && Math.random() < lvl*.12) whistleAt(n + Math.random()*.2, .03 + lvl*.04, g);
     fx.ct = setTimeout(tick, 250); };
   tick();
 }
@@ -3620,7 +3674,7 @@ function arenaBeat(sec=40){
   }
 }
 function beatStop(){ if (fx.beat){ const n = fx.ctx.currentTime; fx.beat.gain.setValueAtTime(fx.beat.gain.value, n); fx.beat.gain.linearRampToValueAtTime(0, n+1.5); fx.beat = null; } }
-function fxClose(){ clearTimeout(fx.ct); try{ speechSynthesis.cancel(); }catch(e){} if (fx.ctx){ fx.ctx.close().catch(()=>{}); } fx.ctx = null; fx.crowd = null; fx.crowdDuck = null; fx.beat = null; }
+function fxClose(){ clearTimeout(fx.ct); try{ speechSynthesis.cancel(); }catch(e){} if (fx.ctx){ fx.ctx.close().catch(()=>{}); } fx.ctx = null; fx.crowd = null; fx.crowdDuck = null; fx.crowdLayers = null; fx.babble = null; fx.beat = null; }
 
 function frVoice(){ const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || []; return vs.find(v=>/^fr/i.test(v.lang) && /thomas|daniel|nicolas/i.test(v.name)) || vs.find(v=>/^fr/i.test(v.lang)) || null; }
 function say(text, o={}){
@@ -3670,9 +3724,12 @@ function openFightNight(mode, wk, trial){
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
   if (annSrc()) makeAnnPlayer("fnYt").then(p=>{ if (fn.on) fn.yt = p; });
   // Entrée en 3D (chargée à l'avance pour démarrer pile au toucher)
+  crowdRender();
   fn.arenaMod = null; if (!matchMedia("(prefers-reduced-motion: reduce)").matches) import("./lib/arena3d.js").then(m=>{ fn.arenaMod = m; }).catch(()=>{});
   if (window.speechSynthesis) speechSynthesis.getVoices();
 }
+// Dès que l'annonce est finie, la musique d'entrée repart
+function musBack(){ const p = fn.mus; if (!p || p.failed || !fn.on) return; try{ if (p.a ? !p.a.paused : (p.getPlayerState && p.getPlayerState() === 1)) return; }catch(e){} try{ if (p.g) p.setVolume(0); p.playVideo(); musFade(90, 2500); }catch(e){} }
 function showMusPlay(){ const x = document.getElementById("fnExtra"); if (x && !document.getElementById("musPlayBtn")) x.insertAdjacentHTML("afterbegin", `<button class="btn red" id="musPlayBtn" data-act="musPlay">Lancer ma musique</button>`); }
 async function musFade(to, ms){
   const p = fn.mus; if (!p) return; let v = 100; try{ v = p.getVolume(); }catch(e){}
@@ -3759,7 +3816,7 @@ async function runFightNight(){
   // 2. L'annonceur : vidéo calée, ou voix de l'app
   if (fn.yt){
     await ytAnnounce(alive, el, opp, name, nick); if (!alive()) return;
-    riser(2); await wait(1500); if (!alive()) return;
+    musBack(); roar(.9, .45); await wait(1500); if (!alive()) return;
   } else {
   crowdLevel(.18, 1.5); riser(2.6); fnText("Mesdames et messieurs", "", "Main event"); a3("look", "speaker"); await wait(400);
   await say("Mesdames et messieurs...", {rate:.78, pitch:.55}); if (!alive()) return;
@@ -3779,11 +3836,13 @@ async function runFightNight(){
   a3("gloves", true); a3("look", "screen"); a3("screen", {top: nick ? `« ${nick} »` : "Coin rouge", big: name, sub:`${W}-${L}-${D} · ${RANKS[ri][0]}`});
   await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); a3("roar"); if (!alive()) return;
   a3("pyro"); await wait(1200); el.classList.remove("red"); a3("tint", null); a3("faceoff"); a3("look", "opponent");
+  musBack(); roar(.9, .45);
   if (fn.arena){ a3("screen", {kind:"vs", top:"Face-à-face", a: name, b:`${opp.first} ${opp.last}`}); await wait(3200); } else await wait(600);
   if (!alive()) return;
   }
 
   if (fn.mode==="fight"){
+    if (fn.mus) await musFade(0, 1500);
     stopArena(el);
     const done = await shadowRounds(alive, el, opp); if (!alive()) return;
     document.getElementById("fnSh").innerHTML = ""; el.classList.remove("rest");
@@ -3807,7 +3866,7 @@ async function runFightNight(){
   document.getElementById("fnExtra").innerHTML = `<div class="fntape"><div><span>${esc(name)}</span><b data-to="${f.me}">0</b></div><div><span>${esc(opp.last)}</span><b data-to="${f.opp.target}">0</b></div></div>`;
   document.querySelectorAll(".fntape b").forEach(b=>{ const to = +b.dataset.to, t0 = performance.now(); const st = now => { const k = Math.min(1,(now-t0)/2200); b.textContent = fmt0(to*(1-Math.pow(1-k,3))) + " XP"; if (k<1 && alive()) requestAnimationFrame(st); }; requestAnimationFrame(st); });
   crowdLevel(.5, 2); await wait(2600); if (!alive()) return;
-  bell(2); crowdLevel(.15, 1);
+  bell(2); crowdLevel(.15, 1); if (fn.mus) musFade(25, 1200);
   const win = f.res==="W", draw = f.res==="D", m = f.method;
   fnText(m.kind==="KO" ? "Arrêt de l'arbitre" : m.kind==="SUB" ? "Il a tapé" : m.kind==="ABD" ? "Arrêt du coin" : "Décision des juges", "", "Fin du combat");
   await say("Mesdames et messieurs...", {rate:.8}); if (!alive()) return;
