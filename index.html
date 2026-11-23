@@ -441,6 +441,9 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fn:has(.sh:not(:empty)) .fnmain{font-size:clamp(36px,10vw,60px)}
 .expimgs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .expimgs img{width:100%;border-radius:6px;border:1px solid var(--line);display:block}
+
+.audbox{display:flex;flex-direction:column;gap:10px;padding:16px;border:2px solid var(--gold);border-radius:6px;background:#0b0909}
+.audbox input[type=range]{width:100%;accent-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -2966,10 +2969,14 @@ function viewCareer(){
     <h3>1. Ta musique d'entrée</h3>
     <label class="f" for="cr_sp">Lien YouTube (son complet) ou Spotify (extrait de 30 s)<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://youtu.be/…" inputmode="url"></label>
     <p class="small muted" style="margin:0">${ytId(c.spotify) ? `Son complet depuis YouTube${ytT(c.spotify)?`, à partir de ${ytT(c.spotify)} s`:""}. Il reprend aussi quand tu gagnes.` : spotifyUri(c.spotify) ? "Spotify ne joue qu'un extrait de 30 s dans une app web. Pour le son complet, colle plutôt le lien YouTube du même morceau." : "Sur YouTube : Partager › Copier le lien. Pour démarrer au refrain, coche « Commencer à » avant de copier. Sans lien, l'app joue un beat d'arène."}</p>
-    <h3>2. L'annonce vidéo</h3>
-    <label class="f" for="cr_yt">Annonce vidéo (lien YouTube)<input id="cr_yt" data-cr="yt" value="${esc(c.yt||"")}" placeholder="https://youtu.be/…" inputmode="url"></label>
-    <div class="row between"><span class="small muted">${!ytId(c.yt) ? "Colle un lien YouTube ci-dessus, puis cale le timing." : c.ytCues&&c.ytCues.length ? `${c.ytCues.length} impact${c.ytCues.length>1?"s":""} calé${c.ytCues.length>1?"s":""} · de ${fmtS(c.ytStart||0)} à ${c.ytEnd?fmtS(c.ytEnd):"la fin"}` : "Pas encore calée : les textes changeront à intervalles réguliers."}</span><button class="btn sm red" data-act="ytCal">Caler le timing</button></div>
-    <p class="small muted" style="margin:0">La vidéo passe sur un écran géant pendant la Fight Night, juste après ton entrée. Les flashs et les textes tombent aux moments que tu as calés. Ensuite, la voix de l'app annonce ton nom.</p>
+    <h3>2. L'annonce</h3>
+    <div class="row between"><span class="small">${c.audio && c.audio.path ? `Fichier : <b>${esc(c.audio.name||"annonce")}</b>` : "Fichier audio (mp3, m4a, wav…)"}</span>
+      <div class="row" style="gap:8px">${c.audio && c.audio.path ? `<button class="btn sm ghost" data-act="annDel">Retirer</button>` : ""}<label class="btn sm" for="annIn">${c.audio && c.audio.path ? "Changer" : "Choisir un fichier"}</label></div></div>
+    <input type="file" id="annIn" accept="audio/*,.mp3,.m4a,.wav,.aac" class="hidden">
+    <label class="f" for="cr_yt">Ou une vidéo (lien YouTube)<input id="cr_yt" data-cr="yt" value="${esc(c.yt||"")}" placeholder="https://youtu.be/…" inputmode="url"></label>
+    ${c.audio && c.audio.path && ytId(c.yt) ? `<p class="small muted" style="margin:0">Le fichier audio passe en priorité sur la vidéo.</p>` : ""}
+    <div class="row between"><span class="small muted">${!annSrc() ? "Ajoute un fichier ou un lien, puis cale le timing." : c.ytCues&&c.ytCues.length ? `${c.ytCues.length} impact${c.ytCues.length>1?"s":""} calé${c.ytCues.length>1?"s":""} · de ${fmtS(c.ytStart||0)} à ${c.ytEnd?fmtS(c.ytEnd):"la fin"}` : "Pas encore calée : les textes changeront à intervalles réguliers."}</span><button class="btn sm red" data-act="ytCal">Caler le timing</button></div>
+    <p class="small muted" style="margin:0">L'annonce passe juste après ton entrée (la vidéo sur un écran géant). Les flashs et les textes tombent aux moments que tu as calés. Ensuite, la voix de l'app annonce ton nom.</p>
     <h3>3. Le combat du week-end</h3>
     <div class="chips">${[[5,"MMA · rounds de 5 min"],[3,"Boxe · rounds de 3 min"]].map(([v,l])=>`<button class="chip ${(c.roundMin||5)===v?"on":""}" data-act="roundMin" data-v="${v}">${l}</button>`).join("")}</div>
     <p class="small muted" style="margin:0">3 rounds (5 pour un combat pour le titre), 1 min de repos entre chaque. Pas de combat le week-end = défaite par forfait le lundi.</p>
@@ -3077,13 +3084,13 @@ function openFightNight(mode, wk, trial){
     <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
     <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div><div id="fnSh" class="sh"></div></div>
     <div class="fnsp" id="fnSpWrap">${ytId(c.spotify) ? `<div class="fnmus"><div id="fnMus"></div></div>` : `<div id="fnSp"></div>`}</div>
-    ${ytId(c.yt) ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
+    ${annSrc()==="yt" ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
     <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":mode==="fight"?(trial?"Essai du combat":"Combat du week-end"):"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
   document.body.appendChild(el); document.body.style.overflow = "hidden";
   if (ytId(c.spotify)) makeYT("fnMus", ytId(c.spotify), ytT(c.spotify)).then(p=>{ if (fn.on) fn.mus = p; });
   const uri = ytId(c.spotify) ? null : spotifyUri(c.spotify);
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
-  if (ytId(c.yt)) makeYT("fnYt", ytId(c.yt), c.ytStart ?? ytT(c.yt)).then(p=>{ if (fn.on) fn.yt = p; });
+  if (annSrc()) makeAnnPlayer("fnYt").then(p=>{ if (fn.on) fn.yt = p; });
   if (window.speechSynthesis) speechSynthesis.getVoices();
 }
 async function musFade(to, ms){
@@ -3136,7 +3143,7 @@ async function runFightNight(){
 
   // 1. L'entrée : musique + foule
   crowdStart();
-  if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(career().ytStart ?? ytT(career().yt), true); }catch(e){} }, 400); }catch(e){} }
+  if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp, hasMus = !!fn.mus;
   if (hasMus){ try{ fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
@@ -3218,6 +3225,39 @@ async function runFightNight(){
 }
 
 
+
+/* ---------- Annonce : fichier audio ou vidéo YouTube, même lecteur ---------- */
+const annSrc = () => { const c = career(); return c.audio && c.audio.path ? "audio" : ytId(c.yt) ? "yt" : null; };
+const annStart = () => { const c = career(); return c.ytStart ?? (annSrc()==="yt" ? ytT(c.yt) : 0); };
+async function audioUrl(path){ const {data, error} = await sb.storage.from("audio").createSignedUrl(path, 3600); if (error) throw error; return data.signedUrl; }
+function audioAdapter(url){
+  const a = new Audio(); a.src = url; a.preload = "auto"; a.setAttribute("playsinline", "");
+  return {a, getCurrentTime:()=>a.currentTime, playVideo:()=>{ const pr = a.play(); pr && pr.catch(()=>{}); }, pauseVideo:()=>a.pause(),
+    seekTo:t=>{ try{ a.currentTime = t; }catch(e){} }, getPlayerState:()=> a.ended ? 0 : !a.paused ? 1 : 2,
+    mute:()=>{ a.muted = true; }, unMute:()=>{ a.muted = false; }, destroy:()=>{ a.pause(); a.removeAttribute("src"); a.load(); }, getDuration:()=>a.duration||0};
+}
+function makeAnnPlayer(elId){
+  const s = annSrc();
+  if (s==="audio") return audioUrl(career().audio.path).then(audioAdapter).catch(()=>null);
+  if (s==="yt") return makeYT(elId, ytId(career().yt), annStart());
+  return Promise.resolve(null);
+}
+const AUDIO_EXT = {mp3:"audio/mpeg", m4a:"audio/x-m4a", aac:"audio/aac", wav:"audio/wav", ogg:"audio/ogg", flac:"audio/flac", mp4:"audio/mp4", webm:"audio/webm", caf:"audio/x-caf"};
+async function uploadAnnounce(file){
+  if (!store.uid){ toast("Connecte-toi d'abord"); return; }
+  if (file.size > 25*1024*1024){ toast("Fichier trop lourd (25 Mo maximum)"); return; }
+  const ext = (file.name.split(".").pop()||"mp3").toLowerCase().replace(/[^a-z0-9]/g,"") || "mp3";
+  const type = file.type || AUDIO_EXT[ext] || "audio/mpeg";
+  toast("Envoi du fichier…");
+  const path = `${store.uid}/annonce-${Date.now()}.${ext}`;
+  const {error} = await sb.storage.from("audio").upload(path, file, {contentType:type, upsert:true});
+  if (error){ toast("L'envoi n'a pas marché : " + (/mime/i.test(error.message||"") ? "format non accepté" : "réessaie")); return; }
+  const c = career(), old = c.audio && c.audio.path;
+  c.audio = {path, name: file.name.slice(0,80)}; c.ytStart = 0; c.ytEnd = null; c.ytCues = []; saveProfile();
+  if (old) sb.storage.from("audio").remove([old]).catch(()=>{});
+  toast("Annonce enregistrée"); render();
+}
+
 /* ---------- Annonce vidéo YouTube calée sur le motion design ---------- */
 function ytId(s){ const m = String(s||"").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : null; }
 function ytT(s){ const m = String(s||"").match(/[?&]t=(\d+)/); return m ? +m[1] : 0; }
@@ -3236,21 +3276,23 @@ function makeYT(elId, vid, start){
 const fmtS = t => (Math.round(t*10)/10).toLocaleString("fr-FR",{minimumFractionDigits:1}) + " s";
 const cal = {p:null, tm:null, start:0, end:null, cues:[], replay:false, last:0};
 function openYtCal(){
-  const c = career(), vid = ytId(c.yt); if (!vid){ toast("Colle d'abord un lien YouTube"); return; }
-  Object.assign(cal, {start: c.ytStart ?? ytT(c.yt), end: c.ytEnd ?? null, cues: (c.ytCues||[]).slice(), replay:false, last:0});
+  const c = career(), src = annSrc(); if (!src){ toast("Ajoute d'abord un fichier audio ou un lien YouTube"); return; }
+  Object.assign(cal, {start: annStart(), end: c.ytEnd ?? null, cues: (c.ytCues||[]).slice(), replay:false, last:0});
   const el = document.createElement("div"); el.id = "ytcal"; el.className = "player";
   el.innerHTML = `<div class="row between"><span class="kicker">Caler l'annonce</span><button class="x" data-act="calClose" aria-label="Fermer">×</button></div>
-    <div class="jumbo on" style="position:relative;inset:auto"><div id="ytCalP"></div></div>
+    ${src==="yt" ? `<div class="jumbo on" style="position:relative;inset:auto"><div id="ytCalP"></div></div>`
+      : `<div class="audbox"><button class="btn red" data-act="calPlay" id="calPlay">Lecture</button><input type="range" id="calSeek" min="0" max="1" step="0.1" value="0" aria-label="Position dans l'annonce"><span class="small muted">${esc(c.audio.name||"")}</span></div>`}
     <div class="row between"><span class="num" id="calNow">0,0 s</span><span class="small muted" id="calInfo"></span></div>
     <div class="grid3"><button class="btn" data-act="calStart">Début ici</button><button class="btn red" data-act="calCue">Impact</button><button class="btn" data-act="calEnd">Fin ici</button></div>
     <div class="chips" id="calCues"></div>
-    <p class="small muted" style="margin:0">Lance la vidéo et touche « Début ici » quand l'annonce commence. Pendant qu'il parle, touche « Impact » à chaque moment fort : « Mesdames et messieurs », l'annonce du main event, le coin bleu, le coin rouge. Touche « Fin ici » quand il a fini. À chaque impact, l'app fera un flash et changera le texte à l'écran.</p>
+    <p class="small muted" style="margin:0">Lance l'annonce et touche « Début ici » quand l'annonce commence. Pendant qu'il parle, touche « Impact » à chaque moment fort : « Mesdames et messieurs », l'annonce du main event, le coin bleu, le coin rouge. Touche « Fin ici » quand il a fini. À chaque impact, l'app fera un flash et changera le texte à l'écran.</p>
     <div class="row"><button class="btn ghost" data-act="calReplay">Revoir avec les flashs</button><button class="btn ghost" data-act="calClear">Effacer les impacts</button></div>
     <button class="btn red" data-act="calSave">Enregistrer le calage</button>`;
   document.body.appendChild(el); paintCal();
-  makeYT("ytCalP", vid, cal.start).then(p=>{ cal.p = p; });
+  makeAnnPlayer("ytCalP").then(p=>{ cal.p = p; if (p && p.a){ p.a.addEventListener("loadedmetadata", ()=>{ const r = document.getElementById("calSeek"); if (r) r.max = p.a.duration || 1; }); p.a.addEventListener("play", ()=>{ const b = document.getElementById("calPlay"); if (b) b.textContent = "Pause"; }); p.a.addEventListener("pause", ()=>{ const b = document.getElementById("calPlay"); if (b) b.textContent = "Lecture"; }); } });
   cal.tm = setInterval(()=>{ if (!cal.p || !cal.p.getCurrentTime) return; let t = 0; try{ t = cal.p.getCurrentTime() || 0; }catch(e){}
     const n = document.getElementById("calNow"); if (n) n.textContent = fmtS(t);
+    const sk = document.getElementById("calSeek"); if (sk && !cal.dragging) sk.value = t;
     if (cal.replay && cal.cues.some(q=>q > cal.last && q <= t)){ const y = document.getElementById("ytcal"); y.classList.remove("calflash"); void y.offsetWidth; y.classList.add("calflash"); }
     if (cal.replay && cal.end && t >= cal.end){ cal.replay = false; try{ cal.p.pauseVideo(); }catch(e){} }
     cal.last = t; }, 80);
@@ -3263,7 +3305,7 @@ const calTime = () => { try{ return cal.p ? cal.p.getCurrentTime() || 0 : 0; }ca
 function closeYtCal(){ clearInterval(cal.tm); try{ cal.p && cal.p.destroy(); }catch(e){} cal.p = null; document.getElementById("ytcal")?.remove(); }
 
 async function ytAnnounce(alive, el, opp, name, nick){
-  const c = career(), p = fn.yt, st = c.ytStart ?? ytT(c.yt), en = c.ytEnd || st + 45;
+  const c = career(), p = fn.yt, st = annStart(), dur = p.getDuration ? p.getDuration() : 0, en = c.ytEnd || (dur > st ? dur : st + 45);
   let cues = (c.ytCues||[]).filter(x=>x>st && x<en).sort((a,b)=>a-b);
   if (!cues.length) cues = [1,2,3].map(k=>st + (en-st)*k/4);
   const texts = [["Mesdames et messieurs","","Main event"], [opp.title?"Combat pour le titre":"Main event", `${opp.rounds} rounds`, "Fight Camp"], [`${opp.first} ${opp.last}`, `« ${opp.nick} » · ${opp.w}-${opp.l}-0`, "Coin bleu"], [name, nick?`« ${nick} »`:"Coin rouge", "Coin rouge"]];
@@ -3275,7 +3317,7 @@ async function ytAnnounce(alive, el, opp, name, nick){
     await wait(70);
     let t = 0, state = -1; try{ t = p.getCurrentTime() || 0; state = p.getPlayerState(); }catch(e){}
     if (state === 1) started = true;
-    if (!started && !hinted && Date.now() - t0 > 3500){ hinted = true; document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">Touche la vidéo pour lancer l'annonce</p>`; }
+    if (!started && !hinted && Date.now() - t0 > 3500){ hinted = true; document.getElementById("fnExtra").innerHTML = annSrc()==="yt" ? `<p class="fnmsg">Touche la vidéo pour lancer l'annonce</p>` : `<button class="btn red" data-act="annPlay">Lancer l'annonce</button>`; }
     if (started && hinted){ hinted = false; document.getElementById("fnExtra").innerHTML = ""; }
     while (started && i < cues.length && t >= cues[i]){
       const k = i + 1; fnFlash(k >= 3 ? "gold" : "flash");
@@ -3568,6 +3610,9 @@ document.addEventListener("click", async e=>{
     case "expImgShare": if (exp.imgs.length) shareFiles(exp.imgs.map(x=>x.file), "Plan repas Fight Camp"); break;
     case "ytCal": openYtCal(); break;
     case "calClose": closeYtCal(); break;
+    case "calPlay": if (cal.p && cal.p.a){ cal.replay = false; if (cal.p.a.paused) cal.p.playVideo(); else cal.p.pauseVideo(); } break;
+    case "annPlay": if (fn.yt){ fn.yt.unMute(); fn.yt.playVideo(); } break;
+    case "annDel": { const c = career(); if (c.audio && c.audio.path) sb.storage.from("audio").remove([c.audio.path]).catch(()=>{}); c.audio = null; c.ytStart = ytT(c.yt||""); c.ytEnd = null; c.ytCues = []; saveProfile(); render(); toast("Fichier retiré"); break; }
     case "calStart": cal.start = calTime(); cal.cues = cal.cues.filter(t=>t>cal.start); paintCal(); toast("Début calé"); break;
     case "calEnd": { const t = calTime(); if (t <= cal.start){ toast("La fin doit être après le début"); break; } cal.end = t; cal.cues = cal.cues.filter(x=>x<t); paintCal(); toast("Fin calée"); break; }
     case "calCue": { const t = calTime(); if (t <= cal.start){ toast("Cale d'abord le début"); break; } cal.cues = cal.cues.concat(t).sort((a,b)=>a-b); paintCal(); const y = document.getElementById("ytcal"); y.classList.remove("calflash"); void y.offsetWidth; y.classList.add("calflash"); break; }
@@ -3679,7 +3724,8 @@ document.addEventListener("click", async e=>{
 
 document.addEventListener("change", async e=>{
   const el = e.target;
-  if (el.dataset.cr==="yt"){ const c = career(); c.yt = el.value.trim(); c.ytStart = ytT(c.yt); c.ytEnd = null; c.ytCues = []; saveProfile(); if (c.yt && !ytId(c.yt)) toast("Lien YouTube non reconnu"); render(); return; }
+  if (el.id==="annIn"){ const f = el.files && el.files[0]; el.value = ""; if (f) uploadAnnounce(f); return; }
+  if (el.dataset.cr==="yt"){ const c = career(); c.yt = el.value.trim(); if (!(c.audio && c.audio.path)){ c.ytStart = ytT(c.yt); c.ytEnd = null; c.ytCues = []; } saveProfile(); if (c.yt && !ytId(c.yt)) toast("Lien YouTube non reconnu"); render(); return; }
   if (el.dataset.cr){ career()[el.dataset.cr] = el.value.trim(); saveProfile(); if (el.dataset.cr==="spotify"){ if (el.value && !spotifyUri(el.value) && !ytId(el.value)) toast("Lien non reconnu"); render(); } return; }
   if (el.dataset.crCheck){ career()[el.dataset.crCheck] = el.checked; saveProfile(); return; }
   if (el.dataset.habit){ day().habits[el.dataset.habit] = el.checked; saveDay();
@@ -3747,6 +3793,7 @@ function shrink(file, max){
 function toDataURL(blob){ return new Promise(r=>{ const fr = new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(blob); }); }
 
 document.addEventListener("input", e=>{
+  if (e.target.id==="calSeek" && cal.p){ cal.dragging = true; cal.replay = false; cal.p.seekTo(+e.target.value); clearTimeout(cal.dt); cal.dt = setTimeout(()=>cal.dragging = false, 400); return; }
   if (e.target.id === "ciqQ"){ ui.ciqQ = e.target.value; clearTimeout(window._cq); window._cq = setTimeout(paintCiq, 180); }
   if (e.target.id === "chefFridge") ui.fridge = e.target.value;
   if (e.target.id === "dishCtx") ui.ctx = e.target.value;
