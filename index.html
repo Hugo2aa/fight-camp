@@ -3504,6 +3504,8 @@ function viewCareer(){
 /* ---------- Fight Night : son, voix, lumières ---------- */
 const fx = {ctx:null};
 function fxInit(){
+  // iPhone : jouer le son même quand le bouton silencieux est activé
+  try{ if (navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}
   if (fx.ctx) return; const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
   fx.ctx = new C(); fx.out = fx.ctx.createGain(); fx.out.gain.value = .9; fx.out.connect(fx.ctx.destination);
   const c = fx.ctx, len = c.sampleRate*4, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0;
@@ -3529,6 +3531,8 @@ function boom(){
   const s = fxNoise(), lp = c.createBiquadFilter(), g2 = c.createGain(); lp.type = "lowpass"; lp.frequency.value = 500;
   g2.gain.setValueAtTime(.8, n); g2.gain.exponentialRampToValueAtTime(.001, n+.35); s.connect(lp); lp.connect(g2); g2.connect(fx.out); s.start(n); s.stop(n+.4);
 }
+function footstep(){ if (!fx.ctx) return; const c = fx.ctx, n = c.currentTime, s = fxNoise(), lp = c.createBiquadFilter(), g = c.createGain();
+  lp.type = "lowpass"; lp.frequency.value = 220; g.gain.setValueAtTime(.32, n); g.gain.exponentialRampToValueAtTime(.001, n+.16); s.connect(lp); lp.connect(g); g.connect(fx.out); s.start(n); s.stop(n+.18); }
 function bell(times=3){
   if (!fx.ctx) return; const c = fx.ctx;
   for (let k=0;k<times;k++){ const n = c.currentTime + k*.34;
@@ -3661,19 +3665,22 @@ async function runFightNight(){
   crowdStart();
   if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp, hasMus = !!fn.mus;
-  if (hasMus){ try{ fn.mus.attachFx && fn.mus.attachFx(); fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
+  if (hasMus){ try{ fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); }catch(e){} }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
   fn.skip = false;
-  const steps = hasMus ? 50 : 28;
+  const steps = hasMus ? 64 : 40;
   // Marche en 3D jusqu'à la cage pendant la musique
   let arena = null, cv3 = null;
   if (fn.arenaMod){ try{
     cv3 = document.createElement("canvas"); cv3.className = "fn3d"; el.insertBefore(cv3, el.firstChild); el.classList.add("walk3d");
     let roared = 0;
-    arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, top: opp.title ? "Combat pour le titre" : "Main event",
-      onProgress: t => { crowdLevel(.25 + t*.35, .3); if (t > .55 && roared < 1){ roared = 1; roar(.75, .45); } if (t > .88 && roared < 2){ roared = 2; roar(1, .55); } }});
+    crowdLevel(.05, .5);
+    arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, top: opp.title ? "Combat pour le titre" : "Main event", record: `${W}-${L}-${D}`, rank: RANKS[ri][0],
+      corner: (typeof fiche === "function" && fiche().corner) || "bleu", onStep: footstep,
+      onProgress: (t, z) => { const lvl = z > 86 ? .05 : z > 62 ? .08 + (86 - z)/24*.3 : .4 + t*.3; if (fx.crowd) fx.crowd.gain.setTargetAtTime(lvl, fx.ctx.currentTime, .4);
+        if (z < 62 && roared < 1){ roared = 1; roar(.85, .45); } if (t > .86 && roared < 2){ roared = 2; roar(1, .55); } }});
     requestAnimationFrame(()=>cv3.classList.add("on"));
   }catch(e){ arena = null; cv3 && cv3.remove(); el.classList.remove("walk3d"); } }
   for (let i=0;i<steps && !fn.skip;i++){ await wait(500); if (!alive()) return; if (i===6) roar(.6,.4); if (i===16) fnText(RANKS[ri][0].toUpperCase(), `${W} victoire${W>1?"s":""} · ${L} défaite${L>1?"s":""}${profile.weightClass?" · "+profile.weightClass:""}`, "Entrée dans l'arène"); }
