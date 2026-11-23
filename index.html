@@ -341,6 +341,19 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
   @keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(217,164,58,.5)}50%{box-shadow:0 0 0 8px rgba(217,164,58,0)}}
   @keyframes ring{from{stroke-dashoffset:var(--c)}}
 }
+.intro{padding:0;justify-content:flex-end;overflow:hidden;z-index:40}
+.intro .ibg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:kb 7s ease-out both}
+.intro .ishade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,12,12,.15),rgba(13,12,12,.25) 40%,rgba(13,12,12,.92))}
+.intro .iq{position:relative;padding:0 24px;font-family:var(--display);text-transform:uppercase;font-size:clamp(40px,11vw,64px);line-height:1;letter-spacing:.005em}
+.intro .iq span{display:inline-block;opacity:0;animation:word .55s cubic-bezier(.2,1.3,.4,1) both}
+.intro .ia{position:relative;padding:18px 24px 0;display:flex;align-items:center;gap:12px;color:var(--gold);font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:0;animation:rise .6s ease-out both}
+.intro .ia i{width:44px;height:4px;background:var(--red)}
+.intro .ihint{position:relative;padding:28px 24px calc(env(safe-area-inset-bottom) + 28px);color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.12em;opacity:0;animation:rise .6s ease-out both}
+.intro.out{animation:introOut .55s cubic-bezier(.6,0,.4,1) forwards}
+@keyframes word{from{opacity:0;transform:translateY(22px) scale(1.25);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
+@keyframes introOut{to{transform:translateY(-100%);opacity:.6}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .big-day{font-family:var(--display);font-size:56px;line-height:.9;color:var(--red)}
 .hidden{display:none!important}
 @media (max-width:380px){.grid3{grid-template-columns:1fr 1fr}}
@@ -630,7 +643,17 @@ async function callEdge(payload, signal){
   if (r.status===429) throw {code:"rate_limited"};
   throw {code:"upstream_error", message:String(msg)};
 }
+const PRICES = {"claude-sonnet-5-5":[2,10], "claude-haiku-5-5":[.1,.5]};   // $ par million de tokens (entrée, sortie)
+const monthKey = () => dkey().slice(0,7);
+function usage(){ const m = monthKey(); if (!profile.aiUsage || profile.aiUsage.month !== m) profile.aiUsage = {month:m, cost:0, calls:0, feat:{}}; return profile.aiUsage; }
+function trackUsage(model, u, feat){
+  if (!u) return; const pr = PRICES[model] || [2,10];
+  const cost = ((u.input_tokens||0) + (u.cache_creation_input_tokens||0)*1.25 + (u.cache_read_input_tokens||0)*.1) * pr[0] / 1e6 + (u.output_tokens||0) * pr[1] / 1e6;
+  const us = usage(); us.cost += cost; us.calls += 1; us.feat[feat||"autre"] = (us.feat[feat||"autre"]||0) + cost; saveProfile();
+}
+function budgetLeft(){ const b = profile.aiBudget || 0; return b ? b - usage().cost : Infinity; }
 async function aiJson(prompt, opts={}){
+  if (budgetLeft() <= 0) throw {code:"budget"};
   const content = [];
   for (const b of (opts.images||[])) content.push({type:"image", source:{type:"base64", media_type:"image/jpeg", data: await blobToB64(b)}});
   content.push({type:"text", text: prompt + "\n\nRéponds uniquement avec le JSON demandé, sans aucun texte autour."});
@@ -640,6 +663,7 @@ async function aiJson(prompt, opts={}){
   for (let round=0; round<4; round++){
     const last = round===3;
     const r = await callEdge({model: opts.model || MODEL_ECO, max_tokens: opts.max_tokens || 4000, messages, tools: apiTools, tool_choice: apiTools && last ? {type:"none"} : undefined}, opts.signal);
+    trackUsage(opts.model || MODEL_ECO, r.usage, opts.feat);
     messages.push({role:"assistant", content:r.content});
     const uses = (r.content||[]).filter(c=>c.type==="tool_use");
     if (!tools || !uses.length || r.stop_reason!=="tool_use"){
@@ -900,6 +924,7 @@ function aiErr(e){
   const c = e && e.code;
   if (c==="cancelled") return "";
   if (c==="not_granted") return "Ce compte n'a pas accès à l'IA de Fight Camp.";
+  if (c==="budget") return "Budget IA du mois atteint (Profil › Coût de l'IA). Augmente-le ou attends le mois prochain.";
   if (c==="no_key") return "La clé API Claude n'est pas encore configurée dans Supabase.";
   if (c==="no_credit") return "Crédits API épuisés : recharge-les sur platform.claude.com (Facturation).";
   if (c==="rate_limited") return "Trop de demandes d'un coup. Réessaie dans une minute.";
@@ -940,7 +965,7 @@ Réponds uniquement avec ce JSON :
 {"plat":"nom court du plat","items":[{"code":12345,"label":"description courte en français","g":150}],"confiance":"faible|moyenne|bonne","remarque":"une phrase utile, par exemple ce qui est difficile à estimer"}`;
   try{
     await loadCiqual();
-    const r = await sampleFn.json(prompt, {images:[blob], tools:[ciqTool], signal: ai.ctl.signal, model: MODEL_PRECIS});
+    const r = await sampleFn.json(prompt, {images:[blob], tools:[ciqTool], signal: ai.ctl.signal, model: MODEL_PRECIS, feat:"photo"});
     const items = validItems(r && r.items);
     if (!items.length){ ai.err = (r && r.remarque) || "Je n'ai pas reconnu d'aliment sur cette photo."; }
     else { draft = {name: String(r.plat||"Repas photo").slice(0,60), items, conf: r.confiance||"", note: r.remarque||"", photo: photoUrl, type: ui.mealType || defaultMealType()}; setTimeout(()=>document.getElementById("draftCard")?.scrollIntoView({behavior:"smooth", block:"start"}), 80); }
@@ -1019,7 +1044,7 @@ Réponds uniquement avec ce JSON :
 {"plats":[{"nom":"nom appétissant","pourquoi":"une phrase","temps_min":20,"items":[{"code":12345,"label":"ingrédient","g":150}],"etapes":["étape courte"],"astuce":"astuce de chef","video":"mots-clés"}]}`;
   try{
     await loadCiqual();
-    const r = await sampleFn.json(prompt, {tools:[ciqTool], signal: ai.ctl.signal, max_tokens:5000});
+    const r = await sampleFn.json(prompt, {tools:[ciqTool], signal: ai.ctl.signal, max_tokens:5000, feat:"chef"});
     chef.results = (r && Array.isArray(r.plats) ? r.plats : []).map(cleanDish).filter(p=>p.items.length);
     if (!chef.results.length) ai.err = "Le Chef n'a rien pu proposer. Réessaie avec d'autres envies.";
   }catch(e){ ai.err = aiErr(e); }
@@ -1041,7 +1066,7 @@ ${CHEF_RULES}
 Réponds uniquement avec ce JSON :
 {"repas":[{"type":"${types[0]}","nom":"nom appétissant","pourquoi":"une phrase","temps_min":15,"items":[{"code":12345,"label":"ingrédient","g":150}],"etapes":["étape courte"],"astuce":"astuce de chef","video":"mots-clés"}]}`;
   await loadCiqual();
-  const r = await sampleFn.json(prompt, {tools:[ciqTool], signal, max_tokens:6000});
+  const r = await sampleFn.json(prompt, {tools:[ciqTool], signal, max_tokens:6000, feat:"planning"});
   return (r && Array.isArray(r.repas) ? r.repas : []).map(cleanDish).filter(p=>p.items.length);
 }
 async function runPlanner(nDays){
@@ -1141,7 +1166,7 @@ Règles : pas de conseil dangereux, pas de déshydratation ni de jeûne extrême
 Réponds uniquement avec ce JSON :
 {"titre":"5 à 8 mots","pourquoi":"2 phrases maximum, liées à ses chiffres","eviter":["aliment précis", "..." (6 à 10)],"privilegier":["aliment précis", "..." (6 à 10)],"astuce":"une astuce pratique pour la journée","idee_repas":"une idée de prochain repas avec quantités"}`;
   try{
-    const r = await sampleFn.json(prompt, {model: MODEL_ECO, max_tokens: 1500, signal: ai.ctl.signal});
+    const r = await sampleFn.json(prompt, {model: MODEL_ECO, max_tokens: 1500, signal: ai.ctl.signal, feat:"conseils"});
     d.tips = {meals: d.meals.length, titre:String(r.titre||""), why:String(r.pourquoi||""), avoid:(r.eviter||[]).map(String).slice(0,12), favor:(r.privilegier||[]).map(String).slice(0,12), astuce:String(r.astuce||""), idee:String(r.idee_repas||""), at:Date.now()};
     saveDay();
   }catch(e){ ai.err = aiErr(e); }
@@ -1149,13 +1174,14 @@ Réponds uniquement avec ce JSON :
 }
 /* --- Compléments alimentaires --- */
 const SUPPS = [
-  ["Créatine monohydrate","3 à 5 g par jour, tous les jours, à n'importe quelle heure.","Le complément le mieux étudié pour la force et la puissance. Elle retient 1 à 2 kg d'eau dans les muscles : à caler avec ton coach avant une pesée officielle."],
-  ["Whey isolat","1 dose (25 à 30 g de protéines) si tu n'atteins pas ton objectif avec les repas.","Pratique après l'entraînement ou en collation. Ce n'est qu'un aliment protéiné, pas un produit magique."],
-  ["Vitamine D3","D'octobre à mars, idéalement après une prise de sang.","Souvent basse en hiver en France. Le dosage se décide avec ton médecin."],
-  ["Oméga-3 (EPA/DHA)","1 à 2 g d'EPA + DHA par jour avec un repas.","Utile si tu manges peu de poisson gras. Cherche un indice de fraîcheur (TOTOX) affiché."],
-  ["Magnésium bisglycinate","300 mg le soir.","Peut aider le sommeil et les crampes ; forme mieux tolérée que l'oxyde de magnésium."],
-  ["Caféine","1 à 3 mg/kg, 30 à 60 min avant une séance intense.","Pas après 14 h pour protéger ton sommeil. Un café fait très bien l'affaire."],
-  ["Électrolytes","Pendant les séances longues ou très transpirées.","Sodium, potassium, magnésium. Ne joue pas avec en période de pesée sans ton coach."]
+  ["Créatine monohydrate","3 à 5 g par jour, tous les jours.","Non interdite par l'AMA. Le complément le mieux étudié pour la force et la puissance. Elle retient 1 à 2 kg d'eau dans les muscles : à caler avec ton coach avant une pesée."],
+  ["Whey isolat","1 dose (25 à 30 g de protéines) si tu n'atteins pas ton objectif avec les repas.","Non interdite. Un aliment protéiné pratique après l'entraînement. C'est la contamination qui est le vrai risque : prends-la certifiée."],
+  ["Caféine","1 à 3 mg/kg, 30 à 60 min avant une séance intense.","Autorisée : elle est seulement surveillée par l'AMA. Pas après 14 h pour protéger ton sommeil. Un café fait l'affaire."],
+  ["Vitamine D3","D'octobre à mars, idéalement après une prise de sang.","Non interdite. Souvent basse en hiver en France ; le dosage se décide avec ton médecin."],
+  ["Oméga-3 (EPA/DHA)","1 à 2 g d'EPA + DHA par jour avec un repas.","Non interdits. Utiles si tu manges peu de poisson gras. Cherche l'indice de fraîcheur (TOTOX) affiché."],
+  ["Magnésium bisglycinate","300 mg le soir.","Non interdit. Peut aider le sommeil et les crampes."],
+  ["Électrolytes","Pendant les séances longues ou très transpirées.","Non interdits. Ne joue pas avec en période de pesée sans ton coach."],
+  ["Bêta-alanine","3 à 6 g par jour en plusieurs prises.","Non interdite. Peut aider sur les efforts intenses de 1 à 4 minutes, comme un round. Picotements normaux."]
 ];
 const BRANDS = [
   ["Nutripure","Marque française, formules courtes et transparentes, dosages affichés, fabrication majoritairement en France. Un très bon choix pour la qualité."],
@@ -1170,6 +1196,7 @@ function suppHTML(){
     <div class="stat" style="gap:10px;margin-top:10px">
       ${SUPPS.map(([n,dose,why])=>`<div class="sp"><b>${n}</b><span class="small" style="color:var(--gold)">${dose}</span><span class="small muted">${why}</span></div>`).join("")}
       <div class="note">À éviter : brûleurs de graisse, diurétiques et produits « sèche express ». Inefficaces au mieux, dangereux au pire, et parfois contaminés par des substances interdites.</div>
+      <div class="note good"><b>Pour la compétition :</b> aucun des compléments ci-dessus n'est interdit par l'Agence mondiale antidopage. Le danger, c'est un produit contaminé. Prends uniquement des références portant <b>Informed Sport</b>, <b>NF EN 17444</b> (ex NF V94-001), <b>Sport Protect</b> ou <b>NSF Certified for Sport</b>, et vérifie le numéro de lot sur le site du label.</div>
       <h3>Marques fiables</h3>
       ${BRANDS.map(([n,t])=>`<div class="sp"><b>${n}</b><span class="small muted">${t}</span></div>`).join("")}
       <div class="note good">Si tu combats en compétition contrôlée, prends des produits portant la mention <b>NF EN 17444</b> (anciennement NF V94-001), <b>Sport Protect</b> ou <b>Informed Sport</b> : ils sont testés contre les substances dopantes.</div>
@@ -1549,6 +1576,21 @@ function drawChart(){
     g.fillStyle="#d9a43a"; g.beginPath(); g.arc(X(projPt.d),Y(projPt.kg),5,0,7); g.fill(); }
   g.beginPath(); g.arc(X(last.d),Y(last.kg),6,0,7); g.fillStyle="#efe7dc"; g.fill(); g.lineWidth=3; g.strokeStyle="#d7262e"; g.stroke();
 }
+function mindIntro(){
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const q = quoteOfDay(), words = q[0].split(" ");
+  const ph = profile.photos.length ? profile.photos[Math.floor(Date.now()/864e5) % profile.photos.length] : null;
+  const el = document.createElement("div"); el.id = "intro"; el.className = "player intro";
+  el.innerHTML = `${ph ? `<img class="ibg" src="${esc(ph.url)}" alt="">` : `<canvas class="ibg" id="introBg"></canvas>`}<div class="ishade"></div>
+    <div class="iq">${words.map((w,i)=>`<span style="animation-delay:${.35 + i*.12}s">${esc(w)}</span>`).join(" ")}</div>
+    <div class="ia" style="animation-delay:${.5 + words.length*.12}s"><i></i>${esc(q[1])}</div>
+    <div class="ihint" style="animation-delay:${1.2 + words.length*.12}s">Glisse ou touche pour continuer</div>`;
+  document.body.appendChild(el);
+  const cv = document.getElementById("introBg"); if (cv){ cv.width = innerWidth; cv.height = innerHeight; bgOctagon(cv.getContext("2d"), innerWidth, innerHeight, Math.floor(Date.now()/864e5), true); }
+  let gone = false; const close = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(()=>el.remove(), 550); };
+  el.addEventListener("click", close); el.addEventListener("touchmove", close, {passive:true}); el.addEventListener("wheel", close, {passive:true});
+  setTimeout(close, 3200 + words.length*120);
+}
 function viewMind(){
   const qs = allQuotes();
   const canUpload = true;
@@ -1617,6 +1659,7 @@ function viewSetup(){
       <p class="small muted" style="margin:0">${matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "Fight Camp est installée sur ton écran d'accueil." : "Sur iPhone, ouvre cette page dans Safari › bouton Partager › « Sur l'écran d'accueil ». Sur Android, menu ⋮ de Chrome › « Installer l'application »."}</p>
     </div>
   </section>
+  ${costCardHTML()}
   ${pushCardHTML()}
   <section class="card">
     <h2>Rappels quotidiens</h2>
@@ -1864,7 +1907,7 @@ async function importProgram(files){
 Réponds uniquement avec ce JSON :
 {"nom":"titre du programme","resume":"une phrase","seances":[{"nom":"Séance A - Force","jour":"lundi ou vide","focus":"ex : bas du corps + cardio","exercices":[{"nom":"Squat","series":"4","reps":"6-8","repos":"2 min","charge":"75% 1RM ou vide","notes":""}]}],"conseils":["..."]}`;
   try{
-    const r = await sampleFn.json(prompt, {images: imgs, signal: prog.ctl.signal, model: MODEL_PRECIS, max_tokens: 6000});
+    const r = await sampleFn.json(prompt, {images: imgs, signal: prog.ctl.signal, model: MODEL_PRECIS, max_tokens: 6000, feat:"programme"});
     const seances = (r && Array.isArray(r.seances) ? r.seances : []).map(s=>({
       nom:String(s.nom||"Séance"), jour:String(s.jour||""), focus:String(s.focus||""),
       exercices:(Array.isArray(s.exercices)?s.exercices:[]).map(e=>({nom:String(e.nom||""),series:String(e.series??""),reps:String(e.reps??""),repos:String(e.repos??""),charge:String(e.charge??""),notes:String(e.notes??"")})).filter(e=>e.nom)
@@ -1892,7 +1935,7 @@ ${hist}
 Conseille la charge de travail pour la prochaine séance en respectant la prescription du coach (vise 1 à 3 répétitions en réserve, garde la technique, en sèche on cherche à maintenir la force plutôt qu'à battre des records). Si l'exercice se fait au poids du corps, charge_kg = null et donne la progression adaptée. Sans historique, donne une méthode de test simple pour trouver la charge.
 Réponds uniquement avec ce JSON :
 {"charge_kg":60,"fourchette":"57,5 à 62,5 kg","echauffement":"ex : 1x8 à 40 kg, 1x4 à 50 kg","explication":"2 phrases max","prochaine_fois":"règle simple pour progresser"}`;
-  try{ advice[key] = {data: await sampleFn.json(prompt, {model: MODEL_ECO, max_tokens: 1200})}; }
+  try{ advice[key] = {data: await sampleFn.json(prompt, {model: MODEL_ECO, max_tokens: 1200, feat:"charge"})}; }
   catch(err){ advice[key] = {err: aiErr(err)||"Demande annulée."}; }
   if (tab==="train") render();
 }
@@ -2151,25 +2194,26 @@ function bgRing(g,W,H,seed){
   grain(g,W,H,r,3000);
 }
 function bgPoster(g,W,H,seed){
-  const r = rnd(seed);
-  // papier crème légèrement vieilli
-  const pg = g.createRadialGradient(W/2,H*.45,H*.1,W/2,H*.45,H*.8); pg.addColorStop(0,"#efe6d6"); pg.addColorStop(1,"#d9cbb3"); g.fillStyle = pg; g.fillRect(0,0,W,H);
-  // trame de points rouges derrière le combattant
-  g.fillStyle = "#c8232b"; const cx = W/2, cy = H*.47, R = W*.55;
-  for (let y = cy-R; y < cy+R; y += 26) for (let x = cx-R; x < cx+R; x += 26){ const d = Math.hypot(x-cx, y-cy)/R; if (d < 1){ g.beginPath(); g.arc(x + ((y/26)%2?13:0), y, 11*(1-d*d)+1, 0, 7); g.fill(); } }
-  // double cadre
-  g.strokeStyle = "#1a1412"; g.lineWidth = 10; g.strokeRect(46,46,W-92,H-92); g.lineWidth = 3; g.strokeRect(70,70,W-140,H-140);
-  // bandeau du haut
-  g.fillStyle = "#1a1412"; g.font = `700 40px ${BODY}`; g.textAlign = "center";
-  g.fillText("FIGHT CAMP PRÉSENTE", W/2, H*.2);
-  g.font = `150px ${DISP}`; g.fillStyle = "#1a1412"; g.fillText("COMBAT", W/2, H*.27);
-  g.fillStyle = "#c8232b"; g.fillText("CONTRE SOI", W/2, H*.27 + 140);
-  g.textAlign = "left";
-  // étoiles et filets
-  g.fillStyle = "#1a1412"; [[W*.2,H*.175],[W*.8,H*.175]].forEach(([x,y])=>{ g.save(); g.translate(x,y); g.beginPath(); for (let k=0;k<10;k++){ const a = -Math.PI/2 + k*Math.PI/5, rr = k%2?9:22; g.lineTo(Math.cos(a)*rr, Math.sin(a)*rr); } g.closePath(); g.fill(); g.restore(); });
-  // grain et taches d'impression
-  for (let i=0;i<14000;i++){ g.fillStyle = `rgba(60,40,20,${r()*.07})`; g.fillRect(r()*W, r()*H, 2, 2); }
-  const v = g.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.75); v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,"rgba(60,35,15,.28)"); g.fillStyle = v; g.fillRect(0,0,W,H);
+  const r = rnd(seed), n = campDay();
+  g.fillStyle = "#0c0b0b"; g.fillRect(0,0,W,H);
+  // grand bloc rouge en diagonale
+  const rg = g.createLinearGradient(0,0,W,H*.7); rg.addColorStop(0,"#e0262f"); rg.addColorStop(1,"#8f1219");
+  g.fillStyle = rg; g.beginPath(); g.moveTo(0,H*.2); g.lineTo(W,H*.06); g.lineTo(W,H*.6); g.lineTo(0,H*.76); g.closePath(); g.fill();
+  // traits de vitesse
+  g.save(); g.beginPath(); g.moveTo(0,H*.2); g.lineTo(W,H*.06); g.lineTo(W,H*.6); g.lineTo(0,H*.76); g.closePath(); g.clip();
+  g.strokeStyle = "rgba(255,255,255,.10)"; for (let i=0;i<26;i++){ const y = r()*H*.8, len = W*(.2+r()*.5), x = r()*W; g.lineWidth = 1 + r()*5; g.beginPath(); g.moveTo(x, y); g.lineTo(x+len, y - len*.135); g.stroke(); }
+  g.restore();
+  // mot géant en contour derrière le combattant
+  g.save(); g.translate(W*.86, H*.7); g.rotate(-Math.PI/2); g.font = `330px ${DISP}`; g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.22)"; g.strokeText("NO EXCUSES", 0, 0); g.restore();
+  // en-tête éditorial
+  g.fillStyle = "#efe7dc"; g.font = `700 34px ${BODY}`; g.fillText("FIGHT CAMP", 96, 120);
+  g.fillStyle = "rgba(239,231,220,.6)"; g.fillText(`ÉDITION N°${String(n).padStart(3,"0")}`, 96, 166);
+  const dt = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase(); g.textAlign = "right"; g.fillText(dt, W-96, 120); g.textAlign = "left";
+  g.fillStyle = "#efe7dc"; g.fillRect(96, 196, 70, 6);
+  // code-barres décoratif
+  for (let i=0, x=W-96-160; i<34; i++){ const w = 2 + (hash("b"+i+seed) % 5); g.fillStyle = "rgba(239,231,220,.55)"; g.fillRect(x, 150, w, 46); x += w + 3; }
+  // grain
+  for (let i=0;i<6000;i++){ g.fillStyle = `rgba(255,255,255,${r()*.05})`; g.fillRect(r()*W, r()*H, 2, 2); }
 }
 function bgSmoke(g,W,H,seed){
   const r = rnd(seed); g.fillStyle="#0b0a0a"; g.fillRect(0,0,W,H);
@@ -2210,7 +2254,7 @@ async function makeWallpaper(o, scale=1){
   const SW=1170, SH=2532, c = document.createElement("canvas"); c.width=Math.round(SW*scale); c.height=Math.round(SH*scale);
   const g = c.getContext("2d"); g.scale(scale,scale);
   try{ await document.fonts.load("100px Anton"); await document.fonts.load("700 40px 'Barlow Semi Condensed'"); }catch(e){}
-  const seed = o.seed ?? Math.floor(Date.now()/864e5), fig = POSES[o.fig] ? o.fig : null, light = o.bg==="poster";
+  const seed = o.seed ?? Math.floor(Date.now()/864e5), fig = POSES[o.fig] ? o.fig : null, light = false;
   if (o.bg==="photo" && profile.photos.length){
     const photo = profile.photos[o.photoIdx!==undefined ? o.photoIdx % profile.photos.length : (Math.floor(Date.now()/864e5)+quoteOffset) % profile.photos.length];
     const img = await new Promise((res,rej)=>{ const im = new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=rej; im.src = photo.url; }).catch(()=>null);
@@ -2481,21 +2525,32 @@ function paintLock(){
 }
 function closeLock(){ const el = document.getElementById("lock"); if (el) el.remove(); }
 const STATUS_FN = SUPA_URL + "/functions/v1/status?t=";
+function costCardHTML(){
+  const us = usage(), b = profile.aiBudget || 0, labels = {photo:"Photos de plats", chef:"Chef · 3 plats", planning:"Chef · journée / semaine", conseils:"Conseils du jour", charge:"Conseils de charge", programme:"Import du programme", autre:"Autre"};
+  const day = new Date().getDate(), dim = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate(), proj = day >= 3 ? us.cost / day * dim : null;
+  return `<section class="card">
+    <div class="row between"><h2>Coût de l'IA</h2><span class="num" style="font-size:28px;color:var(--gold)">${us.cost.toFixed(2).replace(".",",")}<small>$ ce mois</small></span></div>
+    <p class="small muted" style="margin:0">Calculé à partir des tokens réellement facturés par l'API à chaque demande (${us.calls} demande${us.calls>1?"s":""} ce mois-ci)${proj!==null?`. À ce rythme : environ <b style="color:var(--bone)">${proj.toFixed(2).replace(".",",")} $</b> sur le mois`:""}.</p>
+    ${Object.keys(us.feat).length ? `<div>${Object.entries(us.feat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="meal"><span>${labels[k]||k}</span><span class="small muted">${v.toFixed(3).replace(".",",")} $</span></div>`).join("")}</div>` : ""}
+    <label class="f" for="ai_budget">Budget maximum par mois ($)<input id="ai_budget" inputmode="decimal" data-field="aiBudget" value="${b||""}" placeholder="Ex : 5"></label>
+    <p class="small muted" style="margin:0">Une fois le budget atteint, l'app arrête d'appeler l'IA jusqu'au mois suivant. Le reste de l'app continue de marcher.</p>
+  </section>`;
+}
 function lockCardHTML(){
   const on = !!profile.lockOn, link = dw.token ? STATUS_FN + dw.token : "";
   if (on && !dw.token && store.uid) wallToken().then(()=>{ if (tab==="setup") render(); }).catch(()=>{});
   const mt = mealTimes();
   return `<section class="card ${on?"":"hi"}">
     <span class="kicker">Anti-distraction</span>
-    <h2>Blocage des réseaux</h2>
-    <p class="small muted" style="margin:0">Si un défi n'est pas fait 30 minutes après la notification, ou si un repas n'est pas noté 1 h après l'heure prévue (et à 22 h pour toute la journée), tes apps de distraction te renvoient sur Fight Camp jusqu'à ce que ce soit fait. Le téléphone, les appels et les urgences ne sont jamais bloqués.</p>
+    <h2>Blocage du téléphone</h2>
+    <p class="small muted" style="margin:0">Si un défi n'est pas fait 30 minutes après la notification, ou si un repas n'est pas noté 1 h après l'heure prévue (et à 22 h pour toute la journée), chaque app que tu ouvres te renvoie sur Fight Camp jusqu'à ce que ce soit fait. Le téléphone, les appels et les urgences ne sont jamais bloqués.</p>
     <div class="grid3">${[["pdj","Petit-déj"],["dej","Déjeuner"],["din","Dîner"]].map(([k,l])=>`<label class="f" for="mt_${k}">${l}<input id="mt_${k}" type="time" data-mt="${k}" value="${mt[k]||""}"></label>`).join("")}</div>
     <label class="row small" for="lockOn" style="gap:8px"><input type="checkbox" id="lockOn" data-act-change="lockOn" ${on?"checked":""} style="width:auto"> Activer le blocage</label>
     ${on && link ? `
       <h3>À régler une seule fois dans Raccourcis</h3>
       <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px">
         <li>Copie ton lien de contrôle : <button class="btn sm" data-act="lockCopy">Copier le lien</button></li>
-        <li>Raccourcis › <b>Automatisation</b> › <b>+</b> › <b>App</b> › choisis Instagram, TikTok, YouTube, Snapchat… › <b>Est ouverte</b> › <b>Exécuter immédiatement</b>.</li>
+        <li>Raccourcis › <b>Automatisation</b> › <b>+</b> › <b>App</b> › <b>Choisir</b> › sélectionne <b>toutes tes apps</b> sauf Téléphone, Messages, Safari et Raccourcis › <b>Est ouverte</b> › <b>Exécuter immédiatement</b>.</li>
         <li>Action <b>« Obtenir le contenu de l'URL »</b> avec le lien copié.</li>
         <li>Action <b>« Obtenir la valeur du dictionnaire »</b> pour la clé <b>bloquer</b>.</li>
         <li>Action <b>« Si »</b> › <b>est égal à</b> › <b>1</b>, puis dedans <b>« Ouvrir les URL »</b> : <code>https://hugo2aa.github.io/fight-camp/?lock=1</code></li>
@@ -2735,7 +2790,7 @@ function render(){
   if (tab==="mind" && !wall.url && !wall.pending){ wall.pending = true; refreshWallpaper().finally(()=>wall.pending=false); }
   if (tab==="mind") buildThumbs();
 }
-function go(t){ tab=t; render(); window.scrollTo(0,0); }
+function go(t){ const prev = tab; tab=t; render(); window.scrollTo(0,0); if (t==="mind" && prev!=="mind") mindIntro(); }
 
 /* ---------- Actions ---------- */
 function addWeight(kg, d){
@@ -2883,7 +2938,7 @@ document.addEventListener("change", async e=>{
     render(); return; }
   if (el.dataset.field){
     const f = el.dataset.field; let v = el.value;
-    if (["age","height","startWeight","goalWeight","activity","deficit","kcalOverride","protOverride"].includes(f)) v = num(v);
+    if (["age","height","startWeight","goalWeight","activity","deficit","kcalOverride","protOverride","aiBudget"].includes(f)) v = num(v);
     profile[f] = v; if (f==="goalWeight") profile.weightClass = "";
     saveProfile(); render(); return; }
   if (el.dataset.fp){ const f = foodProfile(), k = el.dataset.fp; f[k] = (k==="maxTime"||k==="mealsPerDay") ? +el.value : el.value.trim(); saveProfile(); return; }
