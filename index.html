@@ -552,6 +552,17 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fn.walk3d .fnstage{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 120px);gap:6px}
 .fn.walk3d .fnmain{font-size:clamp(34px,11vw,58px);text-shadow:0 2px 20px rgba(0,0,0,.9)}
 .fn.walk3d #fnTop,.fn.walk3d .fnsub{text-shadow:0 1px 10px rgba(0,0,0,.9)}
+.fn.cage3d .fnbeams{display:none}
+.fn.cage3d .fnstage{position:absolute;left:0;right:0;bottom:0;padding:70px 20px calc(env(safe-area-inset-bottom) + 34px);gap:8px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.55) 35%,rgba(0,0,0,.82))}
+.fn.cage3d .fnmain{font-size:clamp(36px,12vw,64px);text-shadow:0 2px 24px rgba(0,0,0,.95)}
+.fn.cage3d #fnTop,.fn.cage3d .fnsub{text-shadow:0 1px 10px rgba(0,0,0,.9)}
+.fn.cage3d .fnscene .art{transform:scale(.8);transform-origin:50% 100%}
+.fn.cage3d .fnjumbo{top:calc(env(safe-area-inset-top) + 56px);opacity:.0}
+.fn.cage3d .fnjumbo.on{opacity:.92;transform:scale(.6);transform-origin:50% 0}
+.fn.cage3d:has(.fnjumbo.on) .fnstage{margin-top:0}
+.fn.cage3d .fn3d{transition:opacity 1.2s ease,filter .8s ease}
+.fn.cage3d.sc-black .fn3d{filter:brightness(.3)}
+.fn.cage3d.sc-dim .fn3d{filter:brightness(.7)}
 </style>
 </head>
 <body>
@@ -3472,6 +3483,7 @@ function viewCareer(){
     <div class="row between"><span class="small">${c.music && c.music.path ? `Fichier : <b>${esc(c.music.name||"musique")}</b>` : "Fichier audio, sans pub (mp3, m4a…)"}</span>
       <div class="row" style="gap:8px">${c.music && c.music.path ? `<button class="btn sm ghost" data-act="musDel">Retirer</button>` : ""}<label class="btn sm" for="musIn">${c.music && c.music.path ? "Changer" : "Choisir un fichier"}</label></div></div>
     <input type="file" id="musIn" accept="audio/*,.mp3,.m4a,.wav,.aac" class="hidden">
+    ${c.music && c.music.path ? `<label class="row small" for="cr_afx" style="gap:8px;margin:4px 0"><input type="checkbox" id="cr_afx" data-cr-check="arenaFx" ${c.arenaFx!==false?"checked":""} style="width:auto"> Son d'arène (écho de la salle sur la musique et l'annonce)</label>` : ""}
     ${c.music && c.music.path ? `<label class="f" for="cr_ms">Démarrer à (secondes, pour tomber direct sur le refrain)<input id="cr_ms" data-cr="musicStart" inputmode="numeric" value="${esc(c.musicStart||"")}" placeholder="0"></label>` : ""}
     <label class="f" for="cr_sp">${c.music && c.music.path ? "Ou un lien (le fichier passe en priorité)" : "Ou un lien YouTube (son complet) ou Spotify (extrait de 30 s)"}<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://youtu.be/…" inputmode="url"></label>
     <p class="small muted" style="margin:0">${ytId(c.spotify) ? `Son complet depuis YouTube${ytT(c.spotify)?`, à partir de ${ytT(c.spotify)} s`:""}. Il reprend aussi quand tu gagnes.` : spotifyUri(c.spotify) ? "Spotify ne joue qu'un extrait de 30 s dans une app web. Pour le son complet, colle plutôt le lien YouTube du même morceau." : "Sur YouTube : Partager › Copier le lien. Pour démarrer au refrain, coche « Commencer à » avant de copier. Sans lien, l'app joue un beat d'arène."}</p>
@@ -3511,7 +3523,15 @@ function fxInit(){
   const c = fx.ctx, len = c.sampleRate*4, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0;
   for (let i=0;i<len;i++){ const w = Math.random()*2-1; l = (l + .02*w)/1.02; d[i] = l*3.2 + w*.12; }
   fx.noise = b;
+  // Acoustique d'arène : réverbération longue + écho de retour, pour la musique et l'annonce
+  try{ const sr = c.sampleRate, L = Math.floor(sr*3.2), ir = c.createBuffer(2, L, sr);
+    for (let ch=0; ch<2; ch++){ const x = ir.getChannelData(ch); for (let i=0;i<L;i++){ const t = i/sr; x[i] = (Math.random()*2-1) * Math.pow(1 - i/L, 2.2) * Math.exp(-t*1.4) * (t < .012 ? t/.012 : 1); }
+      [[.083,.5],[.19,.32],[.41,.18]].forEach(([d,a])=>{ const k = Math.floor(d*sr) + ch*37; for (let j=0;j<400;j++) x[k+j] += (Math.random()*2-1)*a*(1-j/400); }); }
+    const cv = c.createConvolver(); cv.buffer = ir; const pre = c.createBiquadFilter(); pre.type = "highpass"; pre.frequency.value = 180;
+    const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 4200; const wet = c.createGain(); wet.gain.value = .55;
+    pre.connect(cv); cv.connect(damp); damp.connect(wet); wet.connect(fx.out); fx.verb = pre; }catch(e){ fx.verb = null; }
 }
+const arenaFxOk = () => career().arenaFx !== false && (!!navigator.audioSession || !/iPhone|iPad|iPod/.test(navigator.userAgent));
 function fxNoise(){ const s = fx.ctx.createBufferSource(); s.buffer = fx.noise; s.loop = true; return s; }
 function crowdStart(){
   if (!fx.ctx || fx.crowd) return; const c = fx.ctx;
@@ -3620,7 +3640,10 @@ async function musFade(to, ms){
   for (let k=1;k<=n;k++){ await wait(100); try{ p.setVolume(Math.round(v + (to-v)*k/n)); }catch(e){} }
   if (to === 0){ try{ p.pauseVideo(); }catch(e){} }
 }
+function a3(fnName, arg){ const a = fn.arena; if (!a) return; try{ a[fnName](arg); }catch(e){} }
+function stopArena(el){ const a = fn.arena; fn.arena = null; if (!a) return; const c = document.querySelector("#fn .fn3d"); if (c) c.classList.remove("on"); if (el) el.classList.remove("cage3d","walk3d"); setTimeout(()=>{ try{ a.stop(); }catch(e){} c && c.remove(); }, 1300); }
 function closeFightNight(){
+  try{ fn.arena && fn.arena.stop(); }catch(e){} fn.arena = null;
   fn.on = false; fn.run++; fxClose(); document.querySelectorAll(".fn3d").forEach(c=>c.remove()); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
   try{ fn.wake && fn.wake.release(); }catch(e){} fn.wake = null;
   const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
@@ -3666,7 +3689,7 @@ async function runFightNight(){
   crowdStart();
   if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(annStart(), true); fn.yt.unMute && fn.yt.unMute(); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp, hasMus = !!fn.mus;
-  if (hasMus){ try{ const a = fn.mus.a; if (a){ a.muted = false; a.volume = 1; const pr = a.play(); if (pr) pr.catch(()=>showMusPlay()); } else { fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); } }catch(e){ showMusPlay(); } }
+  if (hasMus){ try{ const a = fn.mus.a; if (a){ a.muted = false; a.volume = 1; if (arenaFxOk()) fn.mus.attachFx(.5); const pr = a.play(); if (pr) pr.catch(()=>showMusPlay()); } else { fn.mus.setVolume(100); fn.mus.unMute(); fn.mus.playVideo(); } }catch(e){ showMusPlay(); } }
   else if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
@@ -3678,14 +3701,15 @@ async function runFightNight(){
     cv3 = document.createElement("canvas"); cv3.className = "fn3d"; el.insertBefore(cv3, el.firstChild); el.classList.add("walk3d");
     let roared = 0;
     crowdLevel(.05, .5);
-    arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, top: opp.title ? "Combat pour le titre" : "Main event", record: `${W}-${L}-${D}`, rank: RANKS[ri][0],
+    arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, myColor: 0xc81e28, oppColor: 0x1f4fb4, top: opp.title ? "Combat pour le titre" : "Main event", record: `${W}-${L}-${D}`, rank: RANKS[ri][0],
       corner: (typeof fiche === "function" && fiche().corner) || "bleu", onStep: footstep,
       onProgress: (t, z) => { const lvl = z > 86 ? .05 : z > 62 ? .08 + (86 - z)/24*.3 : .4 + t*.3; if (fx.crowd) fx.crowd.gain.setTargetAtTime(lvl, fx.ctx.currentTime, .4);
         if (z < 62 && roared < 1){ roared = 1; roar(.85, .45); } if (t > .86 && roared < 2){ roared = 2; roar(1, .55); } }});
     requestAnimationFrame(()=>cv3.classList.add("on"));
   }catch(e){ arena = null; cv3 && cv3.remove(); el.classList.remove("walk3d"); } }
   for (let i=0;i<steps && !fn.skip;i++){ await wait(500); if (!alive()) return; if (i===6) roar(.6,.4); if (i===16) fnText(RANKS[ri][0].toUpperCase(), `${W} victoire${W>1?"s":""} · ${L} défaite${L>1?"s":""}${profile.weightClass?" · "+profile.weightClass:""}`, "Entrée dans l'arène"); }
-  if (arena){ const a = arena, c = cv3; c.classList.remove("on"); el.classList.remove("walk3d"); setTimeout(()=>{ a.stop(); c.remove(); }, 1300); }
+  // On reste dans la cage : l'annonce se fait face à l'adversaire, avec le speaker
+  if (arena){ arena.cage(); arena.look("speaker"); fn.arena = arena; el.classList.remove("walk3d"); el.classList.add("cage3d"); }
   if (hasMus) await musFade(0, 2000);
   else if (hasSp){ try{ fn.sp.pause(); }catch(e){} } else beatStop();
   document.getElementById("fnSpWrap")?.classList.add("gone");
@@ -3696,25 +3720,28 @@ async function runFightNight(){
     await ytAnnounce(alive, el, opp, name, nick); if (!alive()) return;
     riser(2); await wait(1500); if (!alive()) return;
   } else {
-  crowdLevel(.18, 1.5); riser(2.6); fnText("Mesdames et messieurs", "", "Main event"); await wait(400);
+  crowdLevel(.18, 1.5); riser(2.6); fnText("Mesdames et messieurs", "", "Main event"); a3("look", "speaker"); await wait(400);
   await say("Mesdames et messieurs...", {rate:.78, pitch:.55}); if (!alive()) return;
-  boom(); fnFlash(); roar();
+  boom(); fnFlash(); roar(); a3("roar"); a3("look", "screen"); a3("screen", {top:"Ce soir", big: opp.title ? "Combat pour le titre" : "Main event", sub: `${opp.rounds} rounds`, color:"#3a2a05", accent:"#d9a43a"});
   fnText(fn.mode==="walkout" ? "Main event de la semaine" : opp.title ? "Combat pour le titre" : "Main event", `${opp.rounds} rounds`, "Fight Camp");
   await say(opp.title ? `Ce combat est prévu pour ${opp.rounds} rounds... et il est pour le titre !` : `Bienvenue au main event de la semaine ! Un combat prévu pour ${opp.rounds} rounds !`); if (!alive()) return;
   await wait(500);
   fnText(`${opp.first} ${opp.last}`, `« ${opp.nick} » · ${opp.w}-${opp.l}-0 · ${opp.city}`, "Coin bleu"); el.classList.add("blue"); boom();
+  a3("look", "opponent"); a3("tint", 0x2a5cff); a3("flash"); a3("screen", {top:"Coin bleu", big:`${opp.first} ${opp.last}`, sub:`« ${opp.nick} » · ${opp.w}-${opp.l}-0`, color:"#0a1f4a", accent:"#4f8fd6"});
   await say(`Dans le coin bleu... venu de ${opp.city}... avec un palmarès de ${opp.w} victoires et ${opp.l} défaites... ${opp.nick}... ${opp.first} ${opp.last} !`); if (!alive()) return;
-  roar(.55,.25); await wait(900); el.classList.remove("blue"); if (!alive()) return;
+  roar(.55,.25); await wait(900); el.classList.remove("blue"); a3("tint", null); a3("look", "speaker"); if (!alive()) return;
   riser(2.2); await wait(1600); if (!alive()) return;
   }
   if (!(fn.yt && useTrame())){
-  fnText(name, `${nick?`« ${nick} » · `:""}${W}-${L}-${D} · ${RANKS[ri][0]}`, "Coin rouge"); el.classList.add("red"); boom(); fnFlash();
+  fnText(name, `${nick?`« ${nick} » · `:""}${W}-${L}-${D} · ${RANKS[ri][0]}`, "Coin rouge"); el.classList.add("red"); boom(); fnFlash(); a3("tint", 0xff1a24); a3("flash");
   await say(`Et dans le coin rouge... ${profile.weightClass?`combattant de la catégorie des ${profile.weightClass}...`:""} classé ${RANKS[ri][0]}... avec un palmarès de ${W} victoire${W>1?"s":""} et ${L} défaite${L>1?"s":""}...${nick?` ${nick}...`:""}`, {rate:.82}); if (!alive()) return;
-  await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); if (!alive()) return;
-  await wait(1800); el.classList.remove("red"); if (!alive()) return;
+  a3("gloves", true); a3("look", "screen"); a3("screen", {top: nick ? `« ${nick} »` : "Coin rouge", big: name, sub:`${W}-${L}-${D} · ${RANKS[ri][0]}`});
+  await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); a3("roar"); if (!alive()) return;
+  await wait(1800); el.classList.remove("red"); a3("tint", null); a3("look", "opponent"); if (!alive()) return;
   }
 
   if (fn.mode==="fight"){
+    stopArena(el);
     const done = await shadowRounds(alive, el, opp); if (!alive()) return;
     document.getElementById("fnSh").innerHTML = ""; el.classList.remove("rest");
     if (fn.trial){ const me = weekXP(wkKey()), diff = (me - opp.target)/Math.max(1, opp.target), m = done < 2 ? {kind:"ABD", short:"Abandon", txt:`par arrêt du coin au ${ROUND_NAMES[done]} round`, rd:done+1} : fightMethod(diff, hash("m:"+wkKey()), opp.rounds);
@@ -3749,6 +3776,9 @@ async function runFightNight(){
     const winner = win ? name : `${opp.first} ${opp.last}`;
     await say("Et le vainqueur...", {rate:.75}); if (!alive()) return;
     boom(); fnFlash(win ? "gold" : "flash");
+    a3("tint", win ? 0xffb020 : 0x2a5cff); a3("flash"); a3("roar"); a3("look", win ? "screen" : "opponent"); a3("gloves", win);
+    a3("screen", {top: win ? "Vainqueur" : "Défaite", big: winner, sub: m.short || "", color: win ? "#3a2a05" : "#0a1f4a", accent: win ? "#d9a43a" : "#4f8fd6"});
+    if (win) sceneLater(2600, ()=>a3("look", "crowd"));
     fnText(winner, `${m.txt.charAt(0).toUpperCase()+m.txt.slice(1)}`, win ? (f.rankAfter>f.rankBefore ? "Nouveau rang : "+RANKS[f.rankAfter][0] : "Victoire") : "Défaite");
     if (win){ roar(1, .4); confetti(); if (fn.mus){ try{ fn.mus.setVolume(0); fn.mus.playVideo(); }catch(e){} musFade(100, 2500); } } else crowdLevel(.35, .6);
     await say(`${m.txt}... ${win ? (f.rankAfter===6 && f.rankBefore<6 ? `et nouveau champion... ${name} !` : name + " !") : `${opp.nick}... ${opp.first} ${opp.last}.`}`, {rate:.8});
@@ -3828,7 +3858,29 @@ function sparks(n=26){ const el = document.getElementById("fn"); if (!el) return
   box.innerHTML = [...Array(n)].map(()=>{ const a = Math.random()*Math.PI*2, d = 90 + Math.random()*170; return `<i style="--x:${Math.cos(a)*d}px;--y:${Math.sin(a)*d}px;animation-delay:${Math.random()*.08}s"></i>`; }).join("");
   el.appendChild(box); setTimeout(()=>box.remove(), 1300); }
 const sceneLater = (ms, f) => { const run = fn.run; setTimeout(()=>{ if (fn.on && fn.run === run) f(); }, ms); };
+// Dans la cage en 3D : où on regarde, la couleur de la salle et l'écran géant, scène par scène
+function scene3d(s){
+  if (!fn.arena) return; const f = fiche(), blue = norm(f.corner).startsWith("b");
+  const back = (ms, to="speaker") => sceneLater(ms, ()=>a3("look", to));
+  const scr = (top, big, sub, color, accent) => a3("screen", {top, big, sub, color, accent});
+  a3("gloves", false);
+  switch (s.fx){
+    case "open": a3("tint", null); a3("look", "speaker"); a3("screen", null); break;
+    case "impact": a3("look", "screen"); scr("Ce soir", "Main event", "Le combat de la soirée", "#3a2a05", "#d9a43a"); a3("flash"); a3("roar"); back(2200); break;
+    case "spot": a3("tint", 0xffe6c0); a3("look", "speaker"); break;
+    case "wipe": a3("tint", blue ? 0x2a5cff : 0xff1a24); a3("flash"); a3("look", "crowd"); scr("Dans le coin", blue ? "Bleu" : "Rouge", "", blue ? "#0a1f4a" : "#4a0a0d", blue ? "#4f8fd6" : "#d7262e"); back(1800); break;
+    case "measure": a3("look", "screen"); scr("Taille", f.height, toCm(f.height) ? toCm(f.height) + " cm" : ""); back(2400); break;
+    case "weigh": a3("look", "screen"); scr("Pesée officielle", f.weight, toKg(f.weight) ? toKg(f.weight) + " kg" : ""); back(2400); break;
+    case "flag": a3("look", s.cue === "Né à" ? "crowdR" : "crowdL"); scr(s.top, s.main, ""); back(2600); break;
+    case "rings": a3("look", "screen"); scr("À seulement", (parseInt(f.age)||"") + " ans", ""); back(2400); break;
+    case "flip": a3("look", "screen"); scr("Palmarès professionnel", String(f.rec||"0-0-0"), "Victoires · Défaites · Nuls"); back(2600); break;
+    case "heart": a3("tint", 0x220608); a3("look", "opponent"); break;
+    case "eye": a3("look", "speaker"); sceneLater(2150, ()=>{ a3("tint", 0x3a7dff); a3("flash"); a3("roar"); a3("gloves", true); a3("look", "screen"); scr(f.nick ? `« ${f.nick} »` : "", s.main, "", "#0a1f4a", "#8fc4ff"); }); break;
+    case "final": a3("tint", 0xff1a24); a3("flash"); a3("roar"); a3("gloves", true); a3("look", "opponent"); scr("", "Fight Camp", "", "#4a0a0d", "#d7262e"); sceneLater(1800, ()=>a3("tint", null)); break;
+  }
+}
 function playScene(el, s){
+  scene3d(s);
   SCENE_CLS.forEach(k=>el.classList.remove("sc-"+k)); if (s.cls) el.classList.add("sc-"+s.cls);
   el.querySelectorAll(".pyro").forEach(x=>x.remove());
   const sc = document.getElementById("fnScene");
@@ -3868,7 +3920,13 @@ function audioAdapter(url){
     seekTo:t=>{ try{ a.currentTime = t; }catch(e){} }, getPlayerState:()=> a.ended ? 0 : !a.paused ? 1 : 2,
     mute:()=>{ a.muted = true; }, unMute:()=>{ a.muted = false; }, destroy:()=>{ a.pause(); a.removeAttribute("src"); a.load(); }, getDuration:()=>a.duration||0,
     // Le volume passe par Web Audio : sur iPhone, le volume d'un élément audio n'est pas réglable par le code
-    attachFx(){ if (this.g || !fx.ctx) return; try{ const src = fx.ctx.createMediaElementSource(a); this.g = fx.ctx.createGain(); src.connect(this.g); this.g.connect(fx.out); }catch(e){} },
+    // Son de salle : un peu de grave, un médium creusé, une compression de sono et la réverbération de l'arène
+    attachFx(verb){ if (this.g || !fx.ctx) return; try{ const c = fx.ctx, src = c.createMediaElementSource(a); this.g = c.createGain();
+      const lo = c.createBiquadFilter(); lo.type = "lowshelf"; lo.frequency.value = 120; lo.gain.value = verb ? 4 : 0;
+      const mid = c.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 2500; mid.Q.value = .8; mid.gain.value = verb ? -2.5 : 0;
+      const comp = c.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3; comp.attack.value = .01; comp.release.value = .25;
+      src.connect(lo); lo.connect(mid); mid.connect(comp); comp.connect(this.g); this.g.connect(fx.out);
+      if (verb && fx.verb){ const send = c.createGain(); send.gain.value = typeof verb === "number" ? verb : .5; this.g.connect(send); send.connect(fx.verb); } }catch(e){} },
     setVolume(v){ if (this.g) this.g.gain.value = v/100; else a.volume = Math.max(0, Math.min(1, v/100)); },
     getVolume(){ return this.g ? this.g.gain.value*100 : a.volume*100; }};
 }
@@ -3881,7 +3939,7 @@ async function makeMusicPlayer(){
 }
 function makeAnnPlayer(elId){
   const s = annSrc();
-  if (s==="audio") return audioUrl(career().audio.path).then(audioAdapter).catch(()=>null);
+  if (s==="audio") return audioUrl(career().audio.path).then(async u=>{ try{ const r = await fetch(u); if (r.ok) return audioAdapter(URL.createObjectURL(await r.blob())); }catch(e){} return audioAdapter(u); }).catch(()=>null);
   if (s==="yt") return makeYT(elId, ytId(career().yt), annStart());
   return Promise.resolve(null);
 }
@@ -3961,6 +4019,7 @@ async function ytAnnounce(alive, el, opp, name, nick){
   if (scenes && !(c.ytCues||[]).length) cues = scenes.slice(1).map((_,k)=>st + (en-st)*(k+1)/scenes.length);
   const jb = document.getElementById("fnJumbo"); jb && jb.classList.add("on");
   crowdLevel(.04, 1); if (scenes) playScene(el, scenes[0]); else fnText(...texts[0]);
+  if (p.a && arenaFxOk()) p.attachFx(.38);
   try{ p.unMute(); p.seekTo(st, true); p.playVideo(); }catch(e){}
   let i = 0, started = false, hinted = false; const t0 = Date.now();
   while (alive()){
