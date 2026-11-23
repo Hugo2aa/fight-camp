@@ -2743,7 +2743,8 @@ function nextPlanned(){ const o = planOccurrences(dkey(), dkey(addDays(new Date(
 let defi = null;
 function openDefi(key){
   let ex;
-  if (key && key.includes("_")){ const [dk, j] = key.split("_"); const s = defiSlots(dk)[+j]; ex = s ? s.ex : null; }
+  if (key && key.startsWith("t-")){ const parts = key.split("-"); ex = [decodeURIComponent(parts.slice(3).join("-")) || "pompes", +parts[2] || 10, "reps"]; }
+  else if (key && key.includes("_")){ const [dk, j] = key.split("_"); const s = defiSlots(dk)[+j]; ex = s ? s.ex : null; }
   if (!ex) ex = DEFIS[Math.floor(Math.random()*DEFIS.length)];
   defi = {key: key || ("libre-"+Date.now()), n:ex[0], q:ex[1], u:ex[2], count:0, left:ex[2]==="s"?ex[1]:0, run:false};
   let el = document.getElementById("defi"); if (!el){ el = document.createElement("div"); el.id = "defi"; el.className = "player"; document.body.appendChild(el); }
