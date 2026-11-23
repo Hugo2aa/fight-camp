@@ -428,6 +428,19 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 
 .fnmus{width:150px;aspect-ratio:16/9;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-left:auto;background:#000}
 .fnmus iframe{width:100%;height:100%;display:block}
+
+.sh{display:flex;flex-direction:column;gap:14px;margin-top:2vh}
+.sh:empty{display:none}
+.shbar{height:6px;background:#2a2323;border-radius:3px;overflow:hidden}
+.shbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold));transition:width .2s linear}
+.shtime{font-family:var(--display);font-size:clamp(72px,24vw,130px);line-height:.9;font-variant-numeric:tabular-nums}
+.shcall{font-family:var(--display);text-transform:uppercase;font-size:clamp(26px,8vw,40px);line-height:1.02;color:var(--gold);min-height:2.1em}
+.shcall.pop{animation:word .45s cubic-bezier(.2,1.3,.4,1) both}
+.fn.rest{background:radial-gradient(ellipse at 50% 110%,#14302a 0%,#08100e 55%,#000 100%)}
+.fn.rest .shtime{color:#7fc4a8}
+.fn:has(.sh:not(:empty)) .fnmain{font-size:clamp(36px,10vw,60px)}
+.expimgs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.expimgs img{width:100%;border-radius:6px;border:1px solid var(--line);display:block}
 </style>
 </head>
 <body>
@@ -1147,7 +1160,7 @@ async function runPlanner(nDays){
   if (!aiReady()){ ai.kind="plan"; ai.err = "Connecte-toi pour utiliser le Chef."; render(); return; }
   const start = chef.start || dkey();
   ai.busy = true; ai.err = ""; ai.kind = "plan"; ai.ctl = new AbortController();
-  const plan = {created: dkey(), days: [], checked: {}};
+  const plan = {created: dkey(), days: [], checked: {}}; exp.pdf = null; exp.imgs = [];
   profile.mealPlan = plan; render();
   const names = [];
   for (let i=0;i<nDays;i++){
@@ -1366,6 +1379,7 @@ function planHTML(plan){
   const shop = shoppingList(plan), checked = plan.checked || {};
   const left = shop.reduce((a,[,l])=>a+l.filter(x=>!checked[x.code]).length,0);
   return `${days}
+  ${exportCardHTML()}
   <section class="card">
     <div class="row between"><h2>Liste de courses</h2><button class="btn sm" data-act="shopCopy">Copier</button></div>
     <p class="small muted" style="margin:0">${plan.days.length} jour(s) · ${left} article(s) restants. Quantités crues, telles qu'achetées.</p>
@@ -2834,6 +2848,7 @@ function dayXP(dk, noHot){
   if ((d.stretch||[]).length) add("Souplesse", 20);
   if (d.training && Object.values(d.training.logs||{}).some(l=>l && (l.kg||l.reps||l.feel))) add("Séance du coach", 50);
   if (dayScore(dk) >= .8) add("Checklist à 80 %", 25);
+  if (d.fight && d.fight.rounds) add(`Combat du week-end : ${d.fight.rounds} round${d.fight.rounds>1?"s":""}`, 60*d.fight.rounds);
   if (!noHot && [1,2,3].every(i=>dayXP(dkey(addDays(parseKey(dk),-i)), true).total >= 150)) add("En feu : 3 jours à 150 XP", 10);
   return {items:it, total: it.reduce((a,x)=>a+x[1],0)};
 }
@@ -2863,9 +2878,9 @@ function settleCareer(){
   let wk = c.lastSettled ? dkey(addDays(parseKey(c.lastSettled),7)) : c.start;
   while (wk < now){
     if (countedDays(wk)){
+      if (c.fights.some(x=>x.wk===wk)){ c.lastSettled = wk; wk = dkey(addDays(parseKey(wk),7)); changed = true; continue; }
       const last = c.fights[c.fights.length-1], ri = rankIdx(c.pts), opp = oppFor(wk, ri, last && last.res), me = weekXP(wk);
-      const diff = (me - opp.target) / Math.max(1, opp.target), m = fightMethod(diff, hash("m:"+wk), opp.rounds);
-      const res = m.kind==="D" ? "D" : diff > 0 ? "W" : "L";
+      const m = {kind:"FF", short:"Forfait", txt:"par forfait : le combat du week-end n'a pas eu lieu", rd:0}, res = "L";
       const before = c.pts; c.pts = Math.max(0, c.pts + (res==="W" ? 3 : res==="D" ? 1 : -1));
       c.fights.push({wk, opp, me, res, method:m, rankBefore: ri, rankAfter: rankIdx(c.pts), ptsBefore: before});
       c.pending = wk;
@@ -2891,8 +2906,11 @@ function careerCardHTML(){
     </div>
     <div class="tape"><span>Toi</span><div class="tb"><i style="--p:${Math.min(100,me/mx*100)}%"></i></div><b>${fmt0(me)}</b></div>
     <div class="tape opp"><span>Lui</span><div class="tb"><i style="--p:${Math.min(100,oppNow/mx*100)}%"></i><em style="left:${Math.min(100,opp.target/mx*100)}%"></em></div><b>${fmt0(oppNow)}<small>/${fmt0(opp.target)}</small></b></div>
-    <p class="small muted" style="margin:0">Dépasse <b style="color:var(--bone)">${fmt0(opp.target)} XP</b> d'ici dimanche soir pour gagner. Aujourd'hui : <b style="color:var(--gold)">${today.total>=0?"+":""}${today.total} XP</b>${hot?" · en feu":""}.</p>
-    <div class="row"><button class="btn sm" data-act="go" data-tab="career">Ma carrière</button><button class="btn sm red" data-act="walkout">Mon entrée</button></div>
+    ${(()=>{ const fw = c.fights.find(x=>x.wk===wkKey()), fmt = (c.roundMin||5)===3 ? "3 min" : "5 min";
+      if (fw) return `<div class="note good">${fw.res==="W"?"Victoire":fw.res==="D"?"Match nul":"Défaite"} ${esc(fw.method.txt)}. Prochain combat le week-end prochain.</div><div class="row"><button class="btn sm" data-act="go" data-tab="career">Ma carrière</button><button class="btn sm" data-act="fightNight" data-v="${fw.wk}">Revoir le combat</button></div>`;
+      return `<p class="small muted" style="margin:0">${isFightDay() ? `<b style="color:var(--gold)">C'est le week-end du combat.</b> ` : ""}Le combat : <b style="color:var(--bone)">${opp.rounds} rounds de ${fmt}</b> de shadow boxing guidé, samedi ou dimanche. Pour gagner, finis tous les rounds et dépasse son XP. Aujourd'hui : <b style="color:var(--gold)">${today.total>=0?"+":""}${today.total} XP</b>${hot?" · en feu":""}.</p>
+      ${isFightDay() ? `<button class="btn red" data-act="fightLive">Lancer le combat · ${opp.rounds} × ${fmt}</button>` : ""}
+      <div class="row"><button class="btn sm" data-act="go" data-tab="career">Ma carrière</button><button class="btn sm ${isFightDay()?"":"red"}" data-act="walkout">Mon entrée</button></div>`; })()}
   </section>`;
 }
 
@@ -2915,7 +2933,7 @@ function viewCareer(){
   <section class="card">
     <div class="row between"><h2>XP du jour</h2><span class="num" style="color:var(--gold)">${t.total>=0?"+":""}${t.total}</span></div>
     ${t.items.length ? `<div>${t.items.map(([l,v])=>`<div class="meal"><span>${esc(l)}</span><b style="color:${v<0?"var(--red)":"var(--gold)"}">${v>0?"+":""}${v}</b></div>`).join("")}</div>` : `<p class="small muted" style="margin:0">Rien pour l'instant. Note un repas ou valide un défi pour lancer la journée.</p>`}
-    <details class="small"><summary>Barème</summary><p class="muted" style="margin:6px 0 0">Défi validé +20 (+40 dans les 15 min) · Défi bonus +20 · Repas noté +10 · Calories dans la cible +30 · Eau +15 · Pesée +10 · Souplesse +20 · Séance du coach +50 · Checklist 80 % +25 · 3 jours d'affilée à 150 XP : +10 par jour · Défi raté −15 · Calories largement dépassées −10.</p></details>
+    <details class="small"><summary>Barème</summary><p class="muted" style="margin:6px 0 0">Défi validé +20 (+40 dans les 15 min) · Défi bonus +20 · Repas noté +10 · Calories dans la cible +30 · Eau +15 · Pesée +10 · Souplesse +20 · Séance du coach +50 · Checklist 80 % +25 · Round du combat du week-end +60 · 3 jours d'affilée à 150 XP : +10 par jour · Défi raté −15 · Calories largement dépassées −10.</p></details>
   </section>
   <section class="card">
     <h2>Ton entrée</h2>
@@ -2928,8 +2946,11 @@ function viewCareer(){
     <label class="f" for="cr_yt">Annonce vidéo (lien YouTube)<input id="cr_yt" data-cr="yt" value="${esc(c.yt||"")}" placeholder="https://youtu.be/…" inputmode="url"></label>
     <div class="row between"><span class="small muted">${!ytId(c.yt) ? "Colle un lien YouTube ci-dessus, puis cale le timing." : c.ytCues&&c.ytCues.length ? `${c.ytCues.length} impact${c.ytCues.length>1?"s":""} calé${c.ytCues.length>1?"s":""} · de ${fmtS(c.ytStart||0)} à ${c.ytEnd?fmtS(c.ytEnd):"la fin"}` : "Pas encore calée : les textes changeront à intervalles réguliers."}</span><button class="btn sm red" data-act="ytCal">Caler le timing</button></div>
     <p class="small muted" style="margin:0">La vidéo passe sur un écran géant pendant la Fight Night, juste après ton entrée. Les flashs et les textes tombent aux moments que tu as calés. Ensuite, la voix de l'app annonce ton nom.</p>
+    <h3>3. Le combat du week-end</h3>
+    <div class="chips">${[[5,"MMA · rounds de 5 min"],[3,"Boxe · rounds de 3 min"]].map(([v,l])=>`<button class="chip ${(c.roundMin||5)===v?"on":""}" data-act="roundMin" data-v="${v}">${l}</button>`).join("")}</div>
+    <p class="small muted" style="margin:0">3 rounds (5 pour un combat pour le titre), 1 min de repos entre chaque. Pas de combat le week-end = défaite par forfait le lundi.</p>
     <label class="row small" for="cr_voice" style="gap:8px"><input type="checkbox" id="cr_voice" data-cr-check="voice" ${c.voice!==false?"checked":""} style="width:auto"> Voix de l'annonceur</label>
-    <div class="row"><button class="btn red" data-act="walkout">Lancer mon entrée</button><button class="btn" data-act="fightTest">Simuler le combat de la semaine</button></div>
+    <div class="row"><button class="btn red" data-act="walkout">Lancer mon entrée</button><button class="btn" data-act="fightTry">Essai rapide du combat (2 × 20 s)</button><button class="btn ghost" data-act="fightTest">Simuler le verdict</button></div>
   </section>
   <section class="card">
     <h2>Historique des combats</h2>
@@ -3019,21 +3040,21 @@ function loadSpotify(){
 }
 
 const fn = {on:false};
-function openFightNight(mode, wk){
-  const c = career();
+function openFightNight(mode, wk, trial){
+  const c = career(); if (mode==="fight") settleCareer();
   let f = null;
   if (mode==="result"){ f = c.fights.find(x=>x.wk===wk); if (!f) return; }
   if (mode==="test"){ const last = c.fights[c.fights.length-1], ri = rankIdx(c.pts), opp = oppFor(wkKey(), ri, last && last.res), me = weekXP(wkKey());
     const diff = (me - opp.target)/Math.max(1,opp.target), m = fightMethod(diff, hash("m:"+wkKey()), opp.rounds);
     f = {wk:wkKey(), opp, me, res: m.kind==="D" ? "D" : diff>0 ? "W" : "L", method:m, rankBefore:ri, rankAfter:ri, test:true}; }
-  Object.assign(fn, {on:true, mode, f, run: (fn.run||0)+1, sp:null, yt:null, mus:null});
+  Object.assign(fn, {on:true, mode, f, run: (fn.run||0)+1, sp:null, yt:null, mus:null, trial: !!trial});
   const el = document.createElement("div"); el.id = "fn"; el.className = "fn";
   el.innerHTML = `<canvas id="fnCv" aria-hidden="true"></canvas><div class="fnbeams" aria-hidden="true"><i></i><i></i><i></i></div>
     <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
-    <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div></div>
+    <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div><div id="fnSh" class="sh"></div></div>
     <div class="fnsp" id="fnSpWrap">${ytId(c.spotify) ? `<div class="fnmus"><div id="fnMus"></div></div>` : `<div id="fnSp"></div>`}</div>
     ${ytId(c.yt) ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
-    <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
+    <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":mode==="fight"?(trial?"Essai du combat":"Combat du week-end"):"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
   document.body.appendChild(el); document.body.style.overflow = "hidden";
   if (ytId(c.spotify)) makeYT("fnMus", ytId(c.spotify), ytT(c.spotify)).then(p=>{ if (fn.on) fn.mus = p; });
   const uri = ytId(c.spotify) ? null : spotifyUri(c.spotify);
@@ -3049,6 +3070,7 @@ async function musFade(to, ms){
 }
 function closeFightNight(){
   fn.on = false; fn.run++; fxClose(); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
+  try{ fn.wake && fn.wake.release(); }catch(e){} fn.wake = null;
   const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
   const c = career(); if (fn.mode==="result" && c.pending){ c.pending = null; saveProfile(); }
   render();
@@ -3072,7 +3094,15 @@ function confetti(){
   requestAnimationFrame(step);
 }
 async function runFightNight(){
-  const run = fn.run, alive = () => fn.on && fn.run === run, c = career(), f = fn.f;
+  const run = fn.run, alive = () => fn.on && fn.run === run, c = career(); let f = fn.f;
+  if (f && f.method && f.method.kind==="FF"){
+    document.getElementById("fnStart")?.remove(); fxInit(); try{ fx.ctx && fx.ctx.resume(); }catch(e){}
+    crowdStart(); crowdLevel(.12, 1); bell(1);
+    fnText("Forfait", `Semaine du ${parseKey(f.wk).toLocaleDateString("fr-FR",{day:"numeric",month:"long"})} · pas de combat le week-end`, "Défaite");
+    await say("Le combat n'a pas eu lieu. Défaite par forfait."); if (!alive()) return;
+    document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">Un combat manqué compte comme une défaite. Le prochain, tu montes dans la cage.</p><div class="row" style="justify-content:center"><button class="btn red" data-act="fnClose">Compris</button></div>`;
+    return;
+  }
   document.getElementById("fnStart")?.remove();
   fxInit(); try{ fx.ctx && fx.ctx.resume(); }catch(e){}
   if (window.speechSynthesis){ const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } // débloque la voix sur iPhone
@@ -3117,6 +3147,14 @@ async function runFightNight(){
   await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); if (!alive()) return;
   await wait(1800); el.classList.remove("red"); if (!alive()) return;
 
+  if (fn.mode==="fight"){
+    const done = await shadowRounds(alive, el, opp); if (!alive()) return;
+    document.getElementById("fnSh").innerHTML = ""; el.classList.remove("rest");
+    if (fn.trial){ const me = weekXP(wkKey()), diff = (me - opp.target)/Math.max(1, opp.target), m = done < 2 ? {kind:"ABD", short:"Abandon", txt:`par arrêt du coin au ${ROUND_NAMES[done]} round`, rd:done+1} : fightMethod(diff, hash("m:"+wkKey()), opp.rounds);
+      f = {wk:wkKey(), opp, me, res: m.kind==="ABD" ? "L" : m.kind==="D" ? "D" : diff>0 ? "W" : "L", method:m, rankBefore:ri, rankAfter:ri, test:true}; }
+    else f = finalizeLiveFight(opp, done);
+    fn.f = f;
+  }
   if (fn.mode==="walkout"){
     const me = weekXP(wkKey());
     fnText("Le combat continue", `${fmt0(me)} XP pour toi · ${fmt0(opp.target)} XP à battre d'ici dimanche`, "Cette semaine");
@@ -3127,13 +3165,14 @@ async function runFightNight(){
   }
 
   // 3. Le combat et le verdict
-  bell(3); fnText("Combat", "", "Round 1"); await wait(2600); if (!alive()) return;
-  document.getElementById("fnExtra").innerHTML = `<div class="fntape"><div><span>${esc(name)}</span><b data-to="${f.me}">0</b></div><div><span>${esc(opp.last)}</span><b data-to="${opp.target}">0</b></div></div>`;
+  if (fn.mode!=="fight"){ bell(3); fnText("Combat", "", "Round 1"); await wait(2600); if (!alive()) return; }
+  else { fnText("Fin du combat", "Les cartes des juges", ""); await wait(1500); if (!alive()) return; }
+  document.getElementById("fnExtra").innerHTML = `<div class="fntape"><div><span>${esc(name)}</span><b data-to="${f.me}">0</b></div><div><span>${esc(opp.last)}</span><b data-to="${f.opp.target}">0</b></div></div>`;
   document.querySelectorAll(".fntape b").forEach(b=>{ const to = +b.dataset.to, t0 = performance.now(); const st = now => { const k = Math.min(1,(now-t0)/2200); b.textContent = fmt0(to*(1-Math.pow(1-k,3))) + " XP"; if (k<1 && alive()) requestAnimationFrame(st); }; requestAnimationFrame(st); });
   crowdLevel(.5, 2); await wait(2600); if (!alive()) return;
   bell(2); crowdLevel(.15, 1);
   const win = f.res==="W", draw = f.res==="D", m = f.method;
-  fnText(m.kind==="KO" ? "Arrêt de l'arbitre" : m.kind==="SUB" ? "Il a tapé" : "Décision des juges", "", "Fin du combat");
+  fnText(m.kind==="KO" ? "Arrêt de l'arbitre" : m.kind==="SUB" ? "Il a tapé" : m.kind==="ABD" ? "Arrêt du coin" : "Décision des juges", "", "Fin du combat");
   await say("Mesdames et messieurs...", {rate:.8}); if (!alive()) return;
   if (m.kind==="DEC" || m.kind==="SPL" || draw) await say(`après ${m.rd || opp.rounds} rounds... les juges ont rendu leur décision.`);
   else await say(`l'arbitre arrête le combat au ${["premier","deuxième","troisième","quatrième","cinquième"][(m.rd||1)-1]} round.`);
@@ -3150,7 +3189,7 @@ async function runFightNight(){
   if (!alive()) return;
   const msg = win ? (f.rankAfter>f.rankBefore ? `Tu passes ${RANKS[f.rankAfter][0]}.` : "Garde ce rythme la semaine prochaine.")
     : draw ? "Une semaine de plus pour faire la différence." : "Ton prochain adversaire sera un peu moins fort. Relève-toi.";
-  document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">${esc(msg)} ${fmt0(f.me)} XP contre ${fmt0(opp.target)}.</p><div class="row" style="justify-content:center"><button class="btn" data-act="fnReplay">Revoir</button><button class="btn red" data-act="fnClose">Continuer</button></div>`;
+  document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">${esc(msg)} ${fmt0(f.me)} XP contre ${fmt0(f.opp.target)}.</p><div class="row" style="justify-content:center"><button class="btn" data-act="fnReplay">Revoir</button><button class="btn red" data-act="fnClose">Continuer</button></div>`;
   if (!win) await say(msg);
 }
 
@@ -3226,6 +3265,218 @@ async function ytAnnounce(alive, el, opp, name, nick){
   jb && jb.classList.remove("on"); el.classList.remove("blue","red"); crowdLevel(.3, 1.5);
 }
 
+
+/* ---------- Export du planning du Chef : PDF et images ---------- */
+const exp = {busy:false, pdf:null, imgs:[], err:""};
+let jspdfP = null;
+function loadJsPDF(){ if (window.jspdf) return Promise.resolve(window.jspdf); if (jspdfP) return jspdfP;
+  jspdfP = new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = "lib/jspdf.umd.min.js"; s.onload = () => res(window.jspdf); s.onerror = () => { jspdfP = null; rej(new Error("jsPDF")); }; document.head.appendChild(s); });
+  return jspdfP; }
+function wrapText(g, text, maxW){
+  const out = []; String(text||"").split("\n").forEach(par=>{ let line = "";
+    par.split(/\s+/).filter(Boolean).forEach(w=>{ const t = line ? line + " " + w : w; if (g.measureText(t).width > maxW && line){ out.push(line); line = w; } else line = t; });
+    out.push(line); });
+  return out;
+}
+function planMeta(plan){
+  const t = targets(), d0 = parseKey(plan.days[0].date), d1 = parseKey(plan.days[plan.days.length-1].date);
+  const range = plan.days.length > 1 ? `Du ${d0.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})} au ${d1.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}` : d0.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  return {t, range, title: plan.days.length > 1 ? "Ma semaine" : "Ma journée"};
+}
+const dayLabel = dk => parseKey(dk).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"short"});
+const typeName = r => r.type ? (MEAL_TYPES.find(x=>x[0]===typeFromLabel(r.type))||[,r.type])[1] : "Repas";
+
+// Pages A4 (fond clair, imprimable)
+async function loadPdfFonts(){ try{ await Promise.all(["40px Anton","500 30px 'Barlow Semi Condensed'","600 30px 'Barlow Semi Condensed'","700 30px 'Barlow Semi Condensed'"].map(f=>document.fonts.load(f))); }catch(e){} await document.fonts.ready; }
+async function planPages(plan){
+  await loadPdfFonts();
+  const W = 1240, H = 1754, M = 90, pages = [], {t, range, title} = planMeta(plan);
+  let g, y = 0;
+  const page = () => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; g = cv.getContext("2d");
+    g.fillStyle = "#f7f2ea"; g.fillRect(0,0,W,H); g.fillStyle = "#141010"; g.fillRect(0,0,W,78);
+    g.font = "38px Anton, Impact, sans-serif"; g.fillStyle = "#efe7dc"; g.fillText("FIGHT", M, 54); const fw = g.measureText("FIGHT ").width; g.fillStyle = "#d7262e"; g.fillText("CAMP", M+fw, 54);
+    g.font = "600 24px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#b9ada0"; g.textAlign = "right"; g.fillText(`${title.toUpperCase()} · PAGE ${pages.length+1}`, W-M, 50); g.textAlign = "left";
+    pages.push(cv); y = 140; };
+  const need = h => { if (y + h > H - M) page(); };
+  const text = (s, font, color, lh, o={}) => { const x = o.x || M, mw = o.w || (W - 2*M - (x - M)); g.font = font;
+    wrapText(g, s, mw).forEach(l=>{ need(lh); g.font = font; g.fillStyle = color; g.fillText(l, x, y + lh*.78); y += lh; }); y += o.gap || 0; };
+  const rule = (c="#d9cfc3", h=2) => { need(20); g.fillStyle = c; g.fillRect(M, y+8, W-2*M, h); y += 26; };
+  page();
+  text(title.toUpperCase(), "96px Anton, Impact, sans-serif", "#141010", 100);
+  text(range, "500 30px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#6b6058", 40, {gap:10});
+  if (t.kcal) text(`Objectif par jour : ${fmt0(t.kcal)} kcal · ${t.prot} g de protéines · ${t.carbs} g de glucides · ${t.fat} g de lipides`, "600 26px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#d7262e", 36, {gap:16});
+  // Vue d'ensemble
+  plan.days.forEach(d=>{ const tot = itemsTotals(d.repas.flatMap(r=>r.items));
+    need(120); rule("#141010", 3);
+    g.font = "40px Anton, Impact, sans-serif"; g.fillStyle = "#141010"; g.fillText(dayLabel(d.date).toUpperCase(), M, y + 34);
+    g.font = "600 26px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#6b6058"; g.textAlign = "right"; g.fillText(`${fmt0(tot.kcal)} kcal · ${fmt0(tot.p)} g P`, W-M, y + 32); g.textAlign = "left"; y += 52;
+    d.repas.forEach(r=>{ const k = itemsTotals(r.items);
+      need(36); g.font = "700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#b8862a"; g.fillText(typeName(r).toUpperCase(), M, y + 26);
+      text(`${r.nom}  —  ${fmt0(k.kcal)} kcal · ${fmt0(k.p)} g P`, "500 27px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#141010", 36, {x: M + 200}); });
+    y += 6; });
+  // Liste de courses
+  const shop = shoppingList(plan);
+  page(); text("LISTE DE COURSES", "72px Anton, Impact, sans-serif", "#141010", 80);
+  text(`${plan.days.length} jour${plan.days.length>1?"s":""} · quantités crues, telles qu'achetées`, "500 26px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#6b6058", 36, {gap:10});
+  shop.forEach(([grp, list])=>{ need(80); rule(); text(grp.toUpperCase(), "700 24px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#d7262e", 32);
+    list.forEach(x=>{ need(34); g.strokeStyle = "#141010"; g.lineWidth = 2; g.strokeRect(M, y+6, 20, 20);
+      g.font = "500 26px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#141010"; g.fillText(x.nom.length > 70 ? x.nom.slice(0,68)+"…" : x.nom, M + 36, y + 25);
+      g.textAlign = "right"; g.fillStyle = "#6b6058"; g.fillText(qty(x.g), W-M, y + 25); g.textAlign = "left"; y += 36; }); });
+  // Recettes
+  plan.days.forEach(d=>{ page(); text(dayLabel(d.date).toUpperCase(), "72px Anton, Impact, sans-serif", "#141010", 80, {gap:6});
+    d.repas.forEach(r=>{ const k = itemsTotals(r.items);
+      need(160); rule("#141010", 3);
+      text(typeName(r).toUpperCase() + (r.temps ? ` · ${r.temps} MIN` : ""), "700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#b8862a", 30);
+      text(r.nom.toUpperCase(), "44px Anton, Impact, sans-serif", "#141010", 50);
+      text(`${fmt0(k.kcal)} kcal · ${fmt0(k.p)} g protéines · ${fmt0(k.c)} g glucides · ${fmt0(k.f)} g lipides`, "600 24px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#d7262e", 32, {gap:8});
+      text("INGRÉDIENTS · 1 PORTION", "700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#6b6058", 30);
+      r.items.forEach(it=> text(`•  ${it.label || BYCODE[it.code]?.[1] || ""} — ${it.g} g`, "500 25px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#141010", 33, {x: M + 10}));
+      if (r.etapes && r.etapes.length){ y += 8; text("PRÉPARATION", "700 22px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#6b6058", 30);
+        r.etapes.forEach((s,i)=> text(`${i+1}.  ${s}`, "500 25px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#141010", 33, {x: M + 10, gap: 4})); }
+      if (r.astuce){ y += 6; text(`Astuce du chef : ${r.astuce}`, "italic 500 24px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif", "#6b6058", 32); }
+      y += 14; }); });
+  return pages;
+}
+
+// Images pour le téléphone (fond sombre, à garder dans Photos)
+async function planImages(plan){
+  await loadPdfFonts();
+  const W = 1170, M = 70, {t, range, title} = planMeta(plan), out = [];
+  const draw = (build) => { const cv = document.createElement("canvas"); cv.width = W; cv.height = 6000; const g = cv.getContext("2d");
+    g.fillStyle = "#0d0c0c"; g.fillRect(0,0,W,6000); const rg = g.createRadialGradient(W*.8, 0, 0, W*.8, 0, W); rg.addColorStop(0, "rgba(215,38,46,.35)"); rg.addColorStop(1, "rgba(215,38,46,0)"); g.fillStyle = rg; g.fillRect(0,0,W,1400);
+    const y = build(g) + M; const c2 = document.createElement("canvas"); c2.width = W; c2.height = Math.max(y, 1200); c2.getContext("2d").drawImage(cv, 0, 0); return c2; };
+  const head = (g, big) => { g.font = "42px Anton, Impact, sans-serif"; g.fillStyle = "#efe7dc"; g.fillText("FIGHT", M, 110); const fw = g.measureText("FIGHT ").width; g.fillStyle = "#d7262e"; g.fillText("CAMP", M+fw, 110);
+    g.font = "120px Anton, Impact, sans-serif"; g.fillStyle = "#efe7dc"; g.fillText(big, M, 260); g.font = "600 34px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#d9a43a";
+    let y = 320; wrapText(g, range.toUpperCase(), W-2*M).forEach(l=>{ g.fillText(l, M, y); y += 44; }); return y + 20; };
+  out.push(draw(g=>{ let y = head(g, title.toUpperCase());
+    if (t.kcal){ g.font = "600 30px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#9b8f86"; g.fillText(`Objectif : ${fmt0(t.kcal)} kcal · ${t.prot} g de protéines par jour`, M, y); y += 60; }
+    plan.days.forEach(d=>{ const tot = itemsTotals(d.repas.flatMap(r=>r.items)), h0 = y;
+      const rows = d.repas.map(r=>{ g.font = "600 34px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; return wrapText(g, r.nom, W - 2*M - 260); });
+      const hh = 96 + rows.reduce((a,l)=>a + 40 + l.length*42, 0) + 20;
+      g.fillStyle = "#171414"; g.fillRect(M-20, y, W-2*M+40, hh); g.fillStyle = "#d7262e"; g.fillRect(M-20, y, 8, hh);
+      g.font = "54px Anton, Impact, sans-serif"; g.fillStyle = "#efe7dc"; g.fillText(dayLabel(d.date).toUpperCase(), M+10, y + 70);
+      g.font = "600 30px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#d9a43a"; g.textAlign = "right"; g.fillText(`${fmt0(tot.kcal)} kcal · ${fmt0(tot.p)} g P`, W-M, y + 66); g.textAlign = "left";
+      y += 110;
+      d.repas.forEach((r,i)=>{ const k = itemsTotals(r.items); g.font = "700 24px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#9b8f86"; g.fillText(typeName(r).toUpperCase(), M+10, y);
+        g.textAlign = "right"; g.fillText(`${fmt0(k.kcal)} kcal`, W-M, y); g.textAlign = "left"; y += 40;
+        g.font = "600 34px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#efe7dc"; rows[i].forEach(l=>{ g.fillText(l, M+10, y); y += 42; }); y += 0; });
+      y = h0 + hh + 28; });
+    return y; }));
+  const shop = shoppingList(plan);
+  out.push(draw(g=>{ let y = head(g, "COURSES");
+    shop.forEach(([grp, list])=>{ y += 20; g.font = "700 28px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#d7262e"; g.fillText(grp.toUpperCase(), M, y); y += 20;
+      list.forEach(x=>{ y += 52; g.strokeStyle = "#5a5050"; g.lineWidth = 3; g.strokeRect(M, y-30, 32, 32);
+        g.font = "500 34px 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"; g.fillStyle = "#efe7dc"; g.fillText(x.nom.length > 46 ? x.nom.slice(0,44)+"…" : x.nom, M + 52, y);
+        g.textAlign = "right"; g.fillStyle = "#d9a43a"; g.fillText(qty(x.g), W-M, y); g.textAlign = "left"; }); y += 20; });
+    return y; }));
+  return out;
+}
+const canvasBlob = (cv, type="image/png", q) => new Promise(r=>cv.toBlob(r, type, q));
+async function exportPlan(kind){
+  const plan = profile.mealPlan; if (!plan || !plan.days.length) return;
+  exp.busy = kind; exp.err = ""; render();
+  try{
+    if (!CIQ) await loadCiqual();
+    const stamp = plan.days[0].date;
+    if (kind==="pdf"){
+      const [{jsPDF}, pages] = await Promise.all([loadJsPDF(), planPages(plan)]);
+      const doc = new jsPDF({unit:"pt", format:"a4", compress:true});
+      pages.forEach((cv,i)=>{ if (i) doc.addPage(); doc.addImage(cv.toDataURL("image/jpeg", .9), "JPEG", 0, 0, 595.28, 841.89); });
+      exp.pdf = new File([doc.output("blob")], `fight-camp-repas-${stamp}.pdf`, {type:"application/pdf"});
+    } else {
+      const cvs = await planImages(plan);
+      exp.imgs = await Promise.all(cvs.map(async (cv,i)=>{ const b = await canvasBlob(cv); return {file: new File([b], `fight-camp-${i?"courses":"semaine"}-${stamp}.png`, {type:"image/png"}), url: URL.createObjectURL(b)}; }));
+    }
+  }catch(e){ exp.err = "L'export n'a pas marché. Réessaie."; }
+  exp.busy = false; render();
+  document.getElementById("expCard")?.scrollIntoView({behavior:"smooth", block:"start"});
+}
+async function shareFiles(files, title){
+  if (navigator.canShare && navigator.canShare({files})){ try{ await navigator.share({files, title}); return; }catch(e){ if (e.name === "AbortError") return; } }
+  files.forEach(f=>{ const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+}
+function exportCardHTML(){
+  return `<section class="card" id="expCard">
+    <div class="row between"><h2>Exporter</h2><span class="small muted">Planning, courses et recettes</span></div>
+    <div class="row">
+      <button class="btn" data-act="expPdf" ${exp.busy?"disabled":""}>${exp.busy==="pdf"?"Préparation…":"PDF complet"}</button>
+      <button class="btn" data-act="expImg" ${exp.busy?"disabled":""}>${exp.busy==="img"?"Préparation…":"Images"}</button>
+    </div>
+    ${exp.pdf ? `<button class="btn red" data-act="expPdfShare">Enregistrer ou partager le PDF</button>` : ""}
+    ${exp.imgs.length ? `<div class="expimgs">${exp.imgs.map(x=>`<img src="${x.url}" alt="${esc(x.file.name)}">`).join("")}</div>
+      <button class="btn red" data-act="expImgShare">Enregistrer les images</button>
+      <p class="small muted" style="margin:0">Tu peux aussi rester appuyé sur une image › Ajouter à Photos.</p>` : ""}
+    ${exp.err ? `<div class="err">${esc(exp.err)}</div>` : ""}
+  </section>`;
+}
+
+/* ---------- Combat du week-end : shadow boxing guidé, round par round ---------- */
+const COMBOS_MMA = ["Jab, cross","Jab, cross, crochet","Low kick !","Double jab, cross","Crochet au corps, crochet tête","Esquive, remise","Sprawl !","Changement de niveau, double leg","High kick !","Teep","Coude !","Genou !","Jab, low kick","Cross, crochet, low kick","Pivot, sortie","Feinte, cross","Uppercut, crochet","Jab, cross, high kick","Garde haute, avance","Défends le takedown !"];
+const COMBOS_BOXE = ["Jab, cross","Double jab","Jab, cross, crochet","Crochet au corps, crochet tête","Uppercut, crochet","Esquive, remise","Rotation, contre","Jab au corps, jab tête","Cross, crochet, cross","Pivot, sortie","Feinte, cross","Un, deux, trois, quatre","Bloque, remise","Travail de jambes","Jab en reculant"];
+const fmtClock = ms => { const s = Math.max(0, Math.ceil(ms/1000)); return `${Math.floor(s/60)}:${pad(s%60)}`; };
+const ROUND_NAMES = ["premier","deuxième","troisième","quatrième","cinquième"];
+function clap(){ if (!fx.ctx) return; const c = fx.ctx; [0,.14].forEach(dt=>{ const n = c.currentTime + dt, s = fxNoise(), bp = c.createBiquadFilter(), g = c.createGain();
+  bp.type = "bandpass"; bp.frequency.value = 1900; bp.Q.value = 1.4; g.gain.setValueAtTime(.9, n); g.gain.exponentialRampToValueAtTime(.001, n+.08); s.connect(bp); bp.connect(g); g.connect(fx.out); s.start(n); s.stop(n+.1); }); }
+function callout(text){ if (career().voice === false || !window.speechSynthesis || !fn.on) return; const u = new SpeechSynthesisUtterance(text), v = frVoice(); if (v) u.voice = v; u.lang = "fr-FR"; u.rate = 1.12; u.pitch = .8; speechSynthesis.speak(u); }
+function shPaint(o){ const t = document.getElementById("shT"), c = document.getElementById("shC"), b = document.getElementById("shBar");
+  if (t && o.time !== undefined) t.textContent = o.time;
+  if (b && o.p !== undefined) b.style.width = (o.p*100) + "%";
+  if (c && o.call !== undefined){ c.textContent = o.call; c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); } }
+async function shadowRounds(alive, el, opp){
+  const c = career(), trial = !!fn.trial, n = trial ? 2 : opp.rounds;
+  const roundMs = trial ? 20e3 : (c.roundMin || 5) * 60e3, restMs = trial ? 8e3 : 60e3;
+  const combos = (c.roundMin || 5) === 3 ? COMBOS_BOXE : COMBOS_MMA;
+  fn.sh = {paused:false, quit:false, skipRest:false, quitArm:false};
+  try{ fn.wake = await navigator.wakeLock?.request("screen"); }catch(e){}
+  const sh = document.getElementById("fnSh");
+  sh.innerHTML = `<div class="shbar"><i id="shBar"></i></div><div class="shtime" id="shT">${fmtClock(roundMs)}</div><div class="shcall" id="shC"></div>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="shPause" id="shP">Pause</button><button class="btn ghost" data-act="shQuit" id="shQ">Abandonner</button></div>`;
+  const timer = async (ms, onTick) => { let left = ms, last = Date.now();
+    while (left > 0){ await wait(150); if (!alive() || fn.sh.quit) return false; const now = Date.now(); if (!fn.sh.paused) left -= now - last; last = now; if (onTick && onTick(left) === "skip") return true; }
+    return true; };
+  let done = 0;
+  for (let r=1; r<=n; r++){
+    el.classList.add("live"); el.classList.remove("rest");
+    fnText(`Round ${r}`, `${fmtClock(roundMs)} · ${trial ? "essai" : (c.roundMin||5)===3 ? "rounds de boxe" : "rounds de MMA"}`, r===n && n>1 ? "Dernier round" : `Round ${r} sur ${n}`);
+    shPaint({call:""}); bell(1); roar(.6, .15); callout(r===n && n>1 ? `Dernier round ! Tout donner !` : `Round ${r} ! Combattez !`);
+    let nextCall = Date.now() + 4000, said30 = false, said10 = false;
+    const ok = await timer(roundMs, left=>{
+      shPaint({time: fmtClock(left), p: 1 - left/roundMs});
+      if (fn.sh.paused) return;
+      if (!said30 && left <= 30e3 && roundMs > 45e3){ said30 = true; callout("Trente secondes ! Accélère !"); roar(.5,.15); shPaint({call:"30 secondes : accélère !"}); nextCall = Date.now() + 6000; return; }
+      if (!said10 && left <= 10e3){ said10 = true; clap(); shPaint({call:"10 secondes !"}); nextCall = Date.now() + 99e3; return; }
+      if (Date.now() >= nextCall){ const k = combos[Math.floor(Math.random()*combos.length)]; shPaint({call:k}); callout(k); nextCall = Date.now() + 4500 + Math.random()*3500; }
+    });
+    if (!ok) return done;
+    done = r; bell(3); roar(.7, .2);
+    if (!trial){ const d = day(); d.fight = {wk: wkKey(), rounds: r, of: n, at: Date.now()}; saveDay(); }
+    if (r < n){
+      el.classList.add("rest"); fnText("Repos", `Round ${r+1} dans une minute`, `Fin du round ${r}`);
+      shPaint({call:"Respire par le nez. Une gorgée d'eau. Épaules relâchées."});
+      document.getElementById("shP").textContent = "Pause"; fn.sh.skipRest = false;
+      const q = document.getElementById("shQ"); q.textContent = "Reprendre tout de suite"; q.dataset.act = "shSkip";
+      callout(`Fin du ${ROUND_NAMES[r-1]} round. Récupère.`);
+      let said = false;
+      const ok2 = await timer(restMs, left=>{ shPaint({time: fmtClock(left), p: 1 - left/restMs}); if (!said && left <= 10e3){ said = true; clap(); callout("Dix secondes. En place."); } if (fn.sh.skipRest) return "skip"; });
+      q.textContent = "Abandonner"; q.dataset.act = "shQuit"; fn.sh.quitArm = false;
+      if (!ok2) return done;
+    }
+  }
+  return done;
+}
+function finalizeLiveFight(opp, done){
+  const c = career(), wk = wkKey(), ri = rankIdx(c.pts), me = weekXP(wk);
+  const target = Math.round(opp.target * weekDays(wk).length / (countedDays(wk) || 7) / 10) * 10, o = Object.assign({}, opp, {target});
+  let m, res;
+  if (done < opp.rounds){ m = {kind:"ABD", short:`Abandon · R${done+1}`, txt:`par arrêt du coin au ${ROUND_NAMES[done]} round`, rd: done+1}; res = "L"; }
+  else { const diff = (me - target) / Math.max(1, target); m = fightMethod(diff, hash("m:"+wk), opp.rounds); res = m.kind==="D" ? "D" : diff > 0 ? "W" : "L"; }
+  const before = c.pts; c.pts = Math.max(0, c.pts + (res==="W" ? 3 : res==="D" ? 1 : -1));
+  const f = {wk, opp:o, me, res, method:m, rankBefore:ri, rankAfter:rankIdx(c.pts), ptsBefore:before, live:true, rounds:done};
+  c.fights = c.fights.filter(x=>x.wk!==wk).concat(f); c.lastSettled = wk; c.pending = null; saveProfile();
+  return f;
+}
+const isFightDay = () => [0,6].includes(new Date().getDay());
+
 /* ---------- Rendu ---------- */
 function render(){
   $("#hdate").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
@@ -3281,6 +3532,16 @@ document.addEventListener("click", async e=>{
     case "fightTest": openFightNight("test"); break;
     case "fightNight": openFightNight("result", b.dataset.v); break;
     case "fnGo": runFightNight(); break;
+    case "fightLive": openFightNight("fight"); break;
+    case "fightTry": openFightNight("fight", null, true); break;
+    case "roundMin": career().roundMin = +b.dataset.v; saveProfile(); render(); break;
+    case "shPause": fn.sh.paused = !fn.sh.paused; b.textContent = fn.sh.paused ? "Reprendre" : "Pause"; if (fn.sh.paused){ try{ speechSynthesis.cancel(); }catch(e){} } break;
+    case "shQuit": if (!fn.sh.quitArm){ fn.sh.quitArm = true; b.textContent = "Confirmer l'abandon"; setTimeout(()=>{ if (fn.sh){ fn.sh.quitArm = false; if (b.isConnected && b.dataset.act==="shQuit") b.textContent = "Abandonner"; } }, 4000); } else fn.sh.quit = true; break;
+    case "shSkip": fn.sh.skipRest = true; break;
+    case "expPdf": exportPlan("pdf"); break;
+    case "expImg": exportPlan("img"); break;
+    case "expPdfShare": if (exp.pdf) shareFiles([exp.pdf], "Plan repas Fight Camp"); break;
+    case "expImgShare": if (exp.imgs.length) shareFiles(exp.imgs.map(x=>x.file), "Plan repas Fight Camp"); break;
     case "ytCal": openYtCal(); break;
     case "calClose": closeYtCal(); break;
     case "calStart": cal.start = calTime(); cal.cues = cal.cues.filter(t=>t>cal.start); paintCal(); toast("Début calé"); break;
