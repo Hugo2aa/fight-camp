@@ -547,7 +547,6 @@ async function pullAll(){
   await pushState();
   render();
   if (!profile.notifSyncedAt || Date.now() - profile.notifSyncedAt > 6*3600e3) syncNotifs();
-  setTimeout(autoLock, 600);
   if (profile.dailyWall && profile.dailyWall.on && Date.now() - (profile.dailyWall.at||0) > 12*3600e3) setTimeout(()=>prepareDailyWalls(false), 4000);
 }
 async function initStore(){
@@ -1671,7 +1670,8 @@ function viewSetup(){
     <div class="grid3">${[["pesee","Pesée"],["souplesse","Souplesse"],["checklist","Checklist"]].map(([k,l])=>`<label class="f" for="n_${k}">${l}<input id="n_${k}" type="time" data-nf="${k}" value="${notifCfg()[k]||""}"></label>`).join("")}</div>
     <label class="row small" for="n_eau" style="gap:8px"><input type="checkbox" id="n_eau" data-nf="eau" ${notifCfg().eau?"checked":""} style="width:auto"> Rappels d'hydratation selon mon plan (Nutrition › Journal)</label>
     <label class="row small" for="n_b22" style="gap:8px"><input type="checkbox" id="n_b22" data-nf="bilan22" ${notifCfg().bilan22?"checked":""} style="width:auto"> Bilan à 22 h si des repas manquent</label>
-    <p class="small muted" style="margin:0">Les rappels de repas suivent les heures réglées dans « Blocage des réseaux ». Un rappel déjà inutile (eau bue, repas noté, défi fait) n'est pas envoyé.</p>
+    <div class="grid3">${[["pdj","Petit-déj"],["dej","Déjeuner"],["din","Dîner"]].map(([k,l])=>`<label class="f" for="mt_${k}">${l}<input id="mt_${k}" type="time" data-mt="${k}" value="${mealTimes()[k]||""}"></label>`).join("")}</div>
+    <p class="small muted" style="margin:0">Les rappels de repas suivent les heures ci-dessous. Un rappel déjà inutile (eau bue, repas noté, défi fait) n'est pas envoyé.</p>
     <h3>Défis surprise</h3>
     <label class="row small" for="n_defis" style="gap:8px"><input type="checkbox" id="n_defis" data-nf="defis" ${notifCfg().defis?"checked":""} style="width:auto"> Envoyer des défis (pompes, gainage, squats…) au hasard dans la journée</label>
     <div class="grid3">
@@ -1680,7 +1680,6 @@ function viewSetup(){
       <label class="f" for="n_to">À<input id="n_to" type="time" data-nf="defisTo" value="${notifCfg().defisTo}"></label>
     </div>
   </section>
-  ${lockCardHTML()}
   <section class="card">
     <h2>Mon compte</h2>
     <p class="small muted" style="margin:0">${store.session ? "Connecté : " + esc(store.session.user.email) : "Non connecté"}. Tes données et tes photos sont privées et synchronisées sur tous tes appareils.</p>
@@ -2497,57 +2496,9 @@ function hydraCardHTML(){
   </section>`;
 }
 
-/* ---------- Blocage anti-distraction (via Raccourcis) ---------- */
+/* ---------- Heures des repas (rappels) ---------- */
 const MEAL_DEFAULTS = {pdj:"09:30", dej:"13:30", din:"20:30"};
 function mealTimes(){ const c = notifCfg(); c.meals = Object.assign({}, MEAL_DEFAULTS, c.meals||{}); return c.meals; }
-function pendingTasks(){
-  const d = day(), dk = dkey(), nowM = new Date().getHours()*60 + new Date().getMinutes(), out = [];
-  const mt = mealTimes(), has = ty => d.meals.some(m=>m.type===ty);
-  const gM = profile.lockGraceMeal ?? 60, gD = profile.lockGraceDefi ?? 0;
-  Object.entries(mt).forEach(([ty,tm])=>{ if (tm && nowM >= toMin(tm) + gM && !has(ty)) out.push({kind:"meal", ty, label:"Noter ton " + {pdj:"petit-déjeuner",dej:"déjeuner",din:"dîner"}[ty]}); });
-  if (nowM >= 22*60) ["pdj","dej","din"].forEach(ty=>{ if (!has(ty) && !out.some(x=>x.ty===ty)) out.push({kind:"meal", ty, label:"Noter ton " + {pdj:"petit-déjeuner",dej:"déjeuner",din:"dîner"}[ty]}); });
-  if (notifCfg().defis) defiSlots(dk).forEach((s,j)=>{ const key = dk+"_"+j; if (nowM >= toMin(s.time) + gD && !(d.defis||[]).some(x=>x.key===key)) out.push({kind:"defi", key, label:`Défi : ${s.ex[1]}${s.ex[2]==="s"?" s de":""} ${s.ex[0]}`}); });
-  return out;
-}
-let serverTasks = null;
-async function fetchServerTasks(){
-  try{ const t = await wallToken(); const r = await fetch(STATUS_FN + t, {cache:"no-store"}); const j = await r.json(); serverTasks = j.details || []; }
-  catch(e){ serverTasks = null; }
-  if (document.getElementById("lock")) paintLock();
-}
-// À chaque ouverture de l'app : si une tâche bloque, on affiche directement l'écran de blocage
-async function autoLock(){
-  if (!profile.lockOn || !store.uid || document.getElementById("defi")) return;
-  await fetchServerTasks();
-  const d = day(), pend = (serverTasks||[]).filter(t => t.kind==="defi" ? !(d.defis||[]).some(x=>x.key===t.key) : !d.meals.some(m=>m.type===t.ty));
-  if ((pend.length || pendingTasks().length) && !document.getElementById("lock")) openLock();
-}
-document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible") setTimeout(autoLock, 400); });
-function openLock(){
-  let el = document.getElementById("lock"); if (!el){ el = document.createElement("div"); el.id = "lock"; el.className = "player"; document.body.appendChild(el); }
-  paintLock(); if (store.uid) fetchServerTasks();
-}
-function paintLock(){
-  const el = document.getElementById("lock"); if (!el) return;
-  const local = pendingTasks(), d = day();
-  // tâches du serveur encore non faites localement + tâches calculées sur l'appareil
-  const fromServer = (serverTasks||[]).filter(t => t.kind==="defi" ? !(d.defis||[]).some(x=>x.key===t.key) : !d.meals.some(m=>m.type===t.ty));
-  const tasks = fromServer.concat(local.filter(l => !fromServer.some(f => f.label===l.label)));
-  el.innerHTML = tasks.length ? `
-    <div class="row between"><span class="kicker">Fight Camp d'abord</span><span class="small muted">${tasks.length} à faire</span></div>
-    <div class="pname" style="margin-top:4vh">Pas de téléphone tant que ce n'est pas fait</div>
-    <p class="cue">Chaque app te renverra ici jusqu'à ce que tout soit validé. Appels, messages et urgences restent accessibles.</p>
-    <div class="stat" style="gap:10px;margin-top:2vh">${tasks.map(t=> t.kind==="defi"
-      ? `<button class="btn red" data-act="lockDefi" data-v="${t.key}">${esc(t.label)}</button>`
-      : `<div class="row" style="flex-wrap:nowrap"><button class="btn red" style="flex:1" data-act="lockMeal" data-v="${t.ty}">${esc(t.label)}</button><button class="btn ghost sm" data-act="skipMeal" data-v="${t.ty}">J'ai sauté ce repas</button></div>`).join("")}</div>
-    <div class="emerg"><a href="tel:112">Appeler le 112</a><a href="sms:">Messages</a><a href="tel:">Téléphone</a></div>`
-    : `<div class="row between"><span class="kicker" style="color:var(--ok)">Débloqué</span><button class="x" data-act="lockClose" aria-label="Fermer">×</button></div>
-    <div class="pname" style="margin-top:12vh">Tout est fait. Respect.</div>
-    <p class="cue">Tu peux retourner sur tes apps.</p>
-    <button class="btn red" data-act="lockClose" style="margin-top:4vh">Retour à Fight Camp</button>`;
-}
-function closeLock(){ const el = document.getElementById("lock"); if (el) el.remove(); }
-const STATUS_FN = SUPA_URL + "/functions/v1/status?t=";
 function costCardHTML(){
   const us = usage(), b = profile.aiBudget || 0, labels = {photo:"Photos de plats", chef:"Chef · 3 plats", planning:"Chef · journée / semaine", conseils:"Conseils du jour", charge:"Conseils de charge", programme:"Import du programme", autre:"Autre"};
   const day = new Date().getDate(), dim = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate(), proj = day >= 3 ? us.cost / day * dim : null;
@@ -2559,33 +2510,6 @@ function costCardHTML(){
     <p class="small muted" style="margin:0">Une fois le budget atteint, l'app arrête d'appeler l'IA jusqu'au mois suivant. Le reste de l'app continue de marcher.</p>
   </section>`;
 }
-function lockCardHTML(){
-  const on = !!profile.lockOn, link = dw.token ? STATUS_FN + dw.token : "";
-  if (on && !dw.token && store.uid) wallToken().then(()=>{ if (tab==="setup") render(); }).catch(()=>{});
-  const mt = mealTimes();
-  return `<section class="card ${on?"":"hi"}">
-    <span class="kicker">Anti-distraction</span>
-    <h2>Blocage du téléphone</h2>
-    <p class="small muted" style="margin:0">Dès qu'un défi arrive (ou après le délai choisi), ou si un repas n'est pas noté après l'heure prévue (et à 22 h pour toute la journée), chaque app que tu ouvres te renvoie sur Fight Camp jusqu'à ce que ce soit fait. Le téléphone, les appels et les urgences ne sont jamais bloqués.</p>
-    <div class="grid3">${[["pdj","Petit-déj"],["dej","Déjeuner"],["din","Dîner"]].map(([k,l])=>`<label class="f" for="mt_${k}">${l}<input id="mt_${k}" type="time" data-mt="${k}" value="${mt[k]||""}"></label>`).join("")}</div>
-    <div class="grid2">
-      <label class="f" for="lg_d">Défi bloquant<select id="lg_d" data-lg="lockGraceDefi">${[[0,"Dès la notification"],[15,"Après 15 min"],[30,"Après 30 min"]].map(([v,l])=>`<option value="${v}" ${+(profile.lockGraceDefi??0)===v?"selected":""}>${l}</option>`).join("")}</select></label>
-      <label class="f" for="lg_m">Repas bloquant<select id="lg_m" data-lg="lockGraceMeal">${[[30,"30 min après"],[60,"1 h après"],[120,"2 h après"]].map(([v,l])=>`<option value="${v}" ${+(profile.lockGraceMeal??60)===v?"selected":""}>${l}</option>`).join("")}</select></label>
-    </div>
-    <label class="row small" for="lockOn" style="gap:8px"><input type="checkbox" id="lockOn" data-act-change="lockOn" ${on?"checked":""} style="width:auto"> Activer le blocage</label>
-    ${on && link ? `
-      <h3>À régler une seule fois dans Raccourcis</h3>
-      <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px">
-        <li>Copie ton lien de contrôle : <button class="btn sm" data-act="lockCopy">Copier le lien</button></li>
-        <li>Raccourcis › <b>Automatisation</b> › <b>+</b> › <b>App</b> › <b>Choisir</b> › sélectionne <b>toutes tes apps</b> sauf Téléphone, Messages, Safari et Raccourcis › <b>Est ouverte</b> › <b>Exécuter immédiatement</b>.</li>
-        <li>Action <b>« Obtenir le contenu de l'URL »</b> avec le lien copié.</li>
-        <li>Action <b>« Obtenir la valeur du dictionnaire »</b> pour la clé <b>bloquer</b>.</li>
-        <li>Action <b>« Si »</b> › <b>est égal à</b> › <b>1</b>, puis dedans <b>« Ouvrir les URL »</b> : <code>https://hugo2aa.github.io/fight-camp/?lock=1</code></li>
-      </ol>
-      <p class="small muted" style="margin:0">Le lien s'ouvre dans Safari : connecte-toi une fois à Fight Camp dans Safari aussi. Ajoute une notification de 22 h dans « Rappels quotidiens » si tu veux un dernier avertissement.</p>` : ""}
-  </section>`;
-}
-
 /* ---------- Planning, notifications et défis ---------- */
 const VAPID_PUBLIC = "BOdtisEFrEVaccb9AV-HsppJxGLqvoPcAzkgYtrIDE7F54HueXWPKsR8NQeEMKurH1AnyUX9N3T4XgBZcRRBxAk";
 const DEFIS = [["pompes",20,"reps"],["squats",30,"reps"],["gainage",45,"s"],["burpees",10,"reps"],["shadow boxing",60,"s"],["fentes",20,"reps"],["crunchs",25,"reps"],["chaise contre le mur",45,"s"],["montées de genoux",40,"s"],["pompes diamant",12,"reps"],["squats sautés",15,"reps"],["gainage latéral (par côté)",30,"s"],["mountain climbers",40,"s"],["pompes larges",15,"reps"],["fentes sautées",16,"reps"],["superman",20,"reps"],["jumping jacks",50,"reps"],["relevés de bassin",25,"reps"]];
@@ -2643,8 +2567,8 @@ function buildNotifs(){
     const dk = dkey(addDays(now, i));
     if (c.pesee) add(atTime(dk, c.pesee), "Pesée du matin", "À jeun, après les toilettes. Note-la dans Fight Camp.", "./?go=weight", "pesee");
     if (c.eau) hydraPlan(dk).forEach(s=> add(atTime(dk, s.time), `Bois ${s.text}`, `Objectif : ${fmt1(s.cum/1000)} L à ${s.time.replace(":", " h ")}. Note-le dans Fight Camp.`, "./?go=today", "eau", "cum:"+s.cum));
-    Object.entries(mealTimes()).forEach(([ty,tm])=>{ if (tm) add(atTime(dk, tm), `${mealLabel(ty)} : pense à le noter`, "Une photo suffit. Sinon, tes réseaux seront bloqués si le blocage est activé.", "./?go=food&meal="+ty, "repas", ty); });
-    if (c.bilan22) add(atTime(dk, "22:00"), "Bilan de 22 h", "Il manque des repas dans ton journal. Note-les maintenant.", "./?lock=1", "repas22");
+    Object.entries(mealTimes()).forEach(([ty,tm])=>{ if (tm) add(atTime(dk, tm), `${mealLabel(ty)} : pense à le noter`, "Une photo suffit.", "./?go=food&meal="+ty, "repas", ty); });
+    if (c.bilan22) add(atTime(dk, "22:00"), "Bilan de 22 h", "Il manque des repas dans ton journal. Note-les maintenant.", "./?go=food", "repas22");
     if (c.souplesse) add(atTime(dk, c.souplesse), "Souplesse avant de dormir", "10 minutes de hanches pour tes high kicks. Lance la routine guidée.", "./?go=flex", "souplesse");
     if (c.checklist) add(atTime(dk, c.checklist), "Checklist du jour", "Coche tes victoires avant de dormir.", "./?go=today", "checklist");
     if (c.defis) defiSlots(dk).forEach((s,j)=>{ const [n,q,u] = s.ex;
@@ -2772,28 +2696,24 @@ function paintDefi(){
   const el = document.getElementById("defi"); if (!el || !defi) return;
   const done = defi.u==="s" ? defi.left<=0 : defi.count>=defi.q;
   el.innerHTML = `
-    <div class="row between"><span class="kicker">Défi Fight Camp</span>${profile.lockOn && !done ? `<span class="small muted">Bloqué jusqu'à validation</span>` : `<button class="x" data-act="defiClose" aria-label="Fermer">×</button>`}</div>
+    <div class="row between"><span class="kicker">Défi Fight Camp</span><button class="x" data-act="defiClose" aria-label="Fermer">×</button></div>
     <div class="pname" style="margin-top:5vh">${defi.q}${defi.u==="s"?" secondes de":""} ${esc(defi.n)}</div>
     ${defi.u==="s"
       ? `<div class="big" style="color:${done?"var(--gold)":"var(--bone)"}">${Math.max(0,defi.left)}</div><div class="cue">${done?"Validé. Respect.":defi.run?"Tiens bon.":"Lance le chrono quand tu es en place."}</div>`
       : `<button class="tapper ${done?"done":""}" data-act="defiTap" aria-label="Ajouter une répétition"><span class="big">${defi.count}</span><span class="cue">${done?"Validé. Respect.":"Touche à chaque répétition"}</span></button>`}
-    ${profile.lockOn ? `<div class="emerg"><a href="tel:112">Appeler le 112</a><a href="sms:">Messages</a><a href="tel:">Téléphone</a></div>` : ""}
-    <div class="ctrl" style="grid-template-columns:${profile.lockOn?"1fr":"1fr 1fr"}">
-      ${profile.lockOn ? "" : `<button class="btn" data-act="defiClose">Plus tard</button>`}
+    <div class="ctrl" style="grid-template-columns:1fr 1fr">
+      <button class="btn" data-act="defiClose">Plus tard</button>
       ${defi.u==="s" && !done ? `<button class="btn red" data-act="defiRun">${defi.run?"Pause":"Chrono"}</button>` : `<button class="btn red" data-act="defiDone">${done?"Valider":"J'ai fini"}</button>`}
     </div>`;
 }
 function closeDefi(){ if (defi && defi.tm) clearInterval(defi.tm); defi = null; const el = document.getElementById("defi"); if (el) el.remove(); }
 function finishDefi(){
-  const back = defi && defi.fromLock;
   const d = day(); d.defis = (d.defis||[]).filter(x=>x.key!==defi.key).concat({key:defi.key, n:defi.n, q:defi.q, u:defi.u, t:Date.now()});
   saveDay(); closeDefi(); toast("Défi validé"); render();
-  if (back) setTimeout(openLock, 400);
 }
 function handleRoute(){
   const q = new URLSearchParams(location.search);
   if (q.has("defi")) openDefi(q.get("defi"));
-  if (q.has("lock")) setTimeout(openLock, 300);
   if (q.has("meal")){ ui.mealType = q.get("meal"); ui.fdate = dkey(); foodSub = "log"; ui.addMode = "photo"; }
   const g = q.get("go");
   if (g==="flex"){ trainSub = "flex"; tab = "train"; }
@@ -2844,11 +2764,6 @@ document.addEventListener("click", async e=>{
       if (wd.water >= targets().water && profile.habits.find(h=>h.id==="h_water")) wd.habits.h_water = true;
       saveDay(tab==="food" ? fdate() : dkey()); if (navigator.vibrate) navigator.vibrate(12); render(); toast(`+${ml>=1000?fmt1(ml/1000)+" L":Math.round(ml/10)+" cl"} · ${fmt1(wd.water/1000)} L`); break; }
     case "drinkUndo": { const wd = tab==="food" ? day(fdate()) : day(); const last = (wd.waterLog||[]).pop(); if (last){ wd.water = Math.max(0, (wd.water||0) - last.ml); saveDay(tab==="food" ? fdate() : dkey()); render(); } break; }
-    case "lockClose": closeLock(); break;
-    case "lockDefi": closeLock(); openDefi(b.dataset.v); defi.fromLock = true; break;
-    case "lockMeal": closeLock(); ui.mealType = b.dataset.v; ui.fdate = dkey(); foodSub = "log"; ui.addMode = "photo"; go("food"); break;
-    case "skipMeal": { day().meals.push({name:"Repas sauté", kcal:0, p:0, c:0, f:0, type:b.dataset.v, skipped:true}); saveDay(); paintLock(); setTimeout(fetchServerTasks, 2500); toast("Noté comme sauté"); break; }
-    case "lockCopy": { const t = await wallToken().catch(()=>null); if (!t) return; try{ await navigator.clipboard.writeText(STATUS_FN + t); toast("Lien copié"); }catch(err){ toast("Copie refusée"); } break; }
     case "goPlan": trainSub = "plan"; go("train"); break;
     case "pushOn": enablePush(); break;
     case "pushTest": testPush(); break;
@@ -2864,7 +2779,7 @@ document.addEventListener("click", async e=>{
     case "defiNow": openDefi(null); break;
     case "defiTap": if (navigator.vibrate) navigator.vibrate(15); defi.count++; paintDefi(); break;
     case "defiRun": defi.run = !defi.run; clearInterval(defi.tm); if (defi.run){ try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} defi.tm = setInterval(()=>{ defi.left--; if (defi.left<=3 && defi.left>0) beep(660,90); if (defi.left<=0){ clearInterval(defi.tm); beep(1200,300); } paintDefi(); }, 1000); } paintDefi(); break;
-    case "defiDone": finishDefi(); if (document.getElementById("lock")){ paintLock(); setTimeout(fetchServerTasks, 2500); } break;
+    case "defiDone": finishDefi(); break;
     case "defiClose": closeDefi(); break;
     case "copyDefi": try{ await navigator.clipboard.writeText($("#defiLink").value); toast("Lien copié"); }catch(err){ $("#defiLink").select(); } break;
     case "logout": await sb.auth.signOut(); break;
@@ -2977,9 +2892,7 @@ document.addEventListener("change", async e=>{
   if (el.dataset.shop){ const pl = profile.mealPlan; if (pl){ pl.checked = pl.checked||{}; pl.checked[el.dataset.shop] = el.checked; saveProfile(); } return; }
   if (el.dataset.pf){ const k = el.dataset.pf; planForm[k] = el.type==="checkbox" ? el.checked : el.value; if (k==="weeks"||k==="dur"||k==="remind") planForm[k] = +el.value||0; return; }
   if (el.dataset.hy){ hydraCfg()[el.dataset.hy] = el.value; saveProfile(); scheduleNotifSync(); render(); return; }
-  if (el.dataset.lg){ profile[el.dataset.lg] = +el.value; saveProfile(); return; }
   if (el.dataset.mt){ mealTimes()[el.dataset.mt] = el.value; saveProfile(); scheduleNotifSync(); return; }
-  if (el.dataset.actChange==="lockOn"){ profile.lockOn = el.checked; saveProfile(); scheduleNotifSync(); render(); return; }
   if (el.dataset.nf){ const c = notifCfg(), k = el.dataset.nf; c[k] = el.type==="checkbox" ? (k==="eau" ? (el.checked ? "plan" : "") : el.checked) : (k==="defisN" ? +el.value : el.value); saveProfile(); scheduleNotifSync(); if (tab==="today"||el.type==="checkbox") render(); return; }
   if (el.dataset.dg !== undefined && draft){ draft.items[+el.dataset.dg].g = Math.max(0, Math.round(num(el.value)||0)); draft.name = ($("#dr_name")||{}).value || draft.name; render(); return; }
   if (el.id === "dishIn"){ const f = el.files[0]; el.value = ""; if (f){ if (tab!=="food"){ ui.mealType = defaultMealType(); ui.fdate = dkey(); } tab = "food"; foodSub = "log"; ui.addMode = "photo"; analyzePhoto(f); } return; }
