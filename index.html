@@ -2508,17 +2508,26 @@ function pendingTasks(){
   if (notifCfg().defis) defiSlots(dk).forEach((s,j)=>{ const key = dk+"_"+j; if (nowM >= toMin(s.time) + gD && !(d.defis||[]).some(x=>x.key===key)) out.push({kind:"defi", key, label:`Défi : ${s.ex[1]}${s.ex[2]==="s"?" s de":""} ${s.ex[0]}`}); });
   return out;
 }
+let serverTasks = null;
+async function fetchServerTasks(){
+  try{ const t = await wallToken(); const r = await fetch(STATUS_FN + t, {cache:"no-store"}); const j = await r.json(); serverTasks = j.details || []; }
+  catch(e){ serverTasks = null; }
+  if (document.getElementById("lock")) paintLock();
+}
 function openLock(){
   let el = document.getElementById("lock"); if (!el){ el = document.createElement("div"); el.id = "lock"; el.className = "player"; document.body.appendChild(el); }
-  paintLock();
+  paintLock(); if (store.uid) fetchServerTasks();
 }
 function paintLock(){
   const el = document.getElementById("lock"); if (!el) return;
-  const tasks = pendingTasks();
+  const local = pendingTasks(), d = day();
+  // tâches du serveur encore non faites localement + tâches calculées sur l'appareil
+  const fromServer = (serverTasks||[]).filter(t => t.kind==="defi" ? !(d.defis||[]).some(x=>x.key===t.key) : !d.meals.some(m=>m.type===t.ty));
+  const tasks = fromServer.concat(local.filter(l => !fromServer.some(f => f.label===l.label)));
   el.innerHTML = tasks.length ? `
     <div class="row between"><span class="kicker">Fight Camp d'abord</span><span class="small muted">${tasks.length} à faire</span></div>
-    <div class="pname" style="margin-top:4vh">Pas de réseaux tant que ce n'est pas fait</div>
-    <p class="cue">Tes apps te renverront ici jusqu'à ce que tout soit validé. Téléphone et appels d'urgence restent toujours accessibles.</p>
+    <div class="pname" style="margin-top:4vh">Pas de téléphone tant que ce n'est pas fait</div>
+    <p class="cue">Chaque app te renverra ici jusqu'à ce que tout soit validé. Appels, messages et urgences restent accessibles.</p>
     <div class="stat" style="gap:10px;margin-top:2vh">${tasks.map(t=> t.kind==="defi"
       ? `<button class="btn red" data-act="lockDefi" data-v="${t.key}">${esc(t.label)}</button>`
       : `<div class="row" style="flex-wrap:nowrap"><button class="btn red" style="flex:1" data-act="lockMeal" data-v="${t.ty}">${esc(t.label)}</button><button class="btn ghost sm" data-act="skipMeal" data-v="${t.ty}">J'ai sauté ce repas</button></div>`).join("")}</div>
@@ -2767,8 +2776,10 @@ function paintDefi(){
 }
 function closeDefi(){ if (defi && defi.tm) clearInterval(defi.tm); defi = null; const el = document.getElementById("defi"); if (el) el.remove(); }
 function finishDefi(){
+  const back = defi && defi.fromLock;
   const d = day(); d.defis = (d.defis||[]).filter(x=>x.key!==defi.key).concat({key:defi.key, n:defi.n, q:defi.q, u:defi.u, t:Date.now()});
   saveDay(); closeDefi(); toast("Défi validé"); render();
+  if (back) setTimeout(openLock, 400);
 }
 function handleRoute(){
   const q = new URLSearchParams(location.search);
@@ -2825,9 +2836,9 @@ document.addEventListener("click", async e=>{
       saveDay(tab==="food" ? fdate() : dkey()); if (navigator.vibrate) navigator.vibrate(12); render(); toast(`+${ml>=1000?fmt1(ml/1000)+" L":Math.round(ml/10)+" cl"} · ${fmt1(wd.water/1000)} L`); break; }
     case "drinkUndo": { const wd = tab==="food" ? day(fdate()) : day(); const last = (wd.waterLog||[]).pop(); if (last){ wd.water = Math.max(0, (wd.water||0) - last.ml); saveDay(tab==="food" ? fdate() : dkey()); render(); } break; }
     case "lockClose": closeLock(); break;
-    case "lockDefi": closeLock(); openDefi(b.dataset.v); break;
+    case "lockDefi": closeLock(); openDefi(b.dataset.v); defi.fromLock = true; break;
     case "lockMeal": closeLock(); ui.mealType = b.dataset.v; ui.fdate = dkey(); foodSub = "log"; ui.addMode = "photo"; go("food"); break;
-    case "skipMeal": { day().meals.push({name:"Repas sauté", kcal:0, p:0, c:0, f:0, type:b.dataset.v, skipped:true}); saveDay(); paintLock(); toast("Noté comme sauté"); break; }
+    case "skipMeal": { day().meals.push({name:"Repas sauté", kcal:0, p:0, c:0, f:0, type:b.dataset.v, skipped:true}); saveDay(); paintLock(); setTimeout(fetchServerTasks, 2500); toast("Noté comme sauté"); break; }
     case "lockCopy": { const t = await wallToken().catch(()=>null); if (!t) return; try{ await navigator.clipboard.writeText(STATUS_FN + t); toast("Lien copié"); }catch(err){ toast("Copie refusée"); } break; }
     case "goPlan": trainSub = "plan"; go("train"); break;
     case "pushOn": enablePush(); break;
@@ -2844,7 +2855,7 @@ document.addEventListener("click", async e=>{
     case "defiNow": openDefi(null); break;
     case "defiTap": if (navigator.vibrate) navigator.vibrate(15); defi.count++; paintDefi(); break;
     case "defiRun": defi.run = !defi.run; clearInterval(defi.tm); if (defi.run){ try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} defi.tm = setInterval(()=>{ defi.left--; if (defi.left<=3 && defi.left>0) beep(660,90); if (defi.left<=0){ clearInterval(defi.tm); beep(1200,300); } paintDefi(); }, 1000); } paintDefi(); break;
-    case "defiDone": finishDefi(); if (document.getElementById("lock")) paintLock(); break;
+    case "defiDone": finishDefi(); if (document.getElementById("lock")){ paintLock(); setTimeout(fetchServerTasks, 2500); } break;
     case "defiClose": closeDefi(); break;
     case "copyDefi": try{ await navigator.clipboard.writeText($("#defiLink").value); toast("Lien copié"); }catch(err){ $("#defiLink").select(); } break;
     case "logout": await sb.auth.signOut(); break;
