@@ -360,6 +360,62 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .big-day{font-family:var(--display);font-size:56px;line-height:.9;color:var(--red)}
 .hidden{display:none!important}
 @media (max-width:380px){.grid3{grid-template-columns:1fr 1fr}}
+
+.career .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+.vsn{font-family:var(--display);text-transform:uppercase;font-size:24px;line-height:1}
+.vsx{font-family:var(--display);color:var(--red);font-size:28px;transform:skewX(-8deg)}
+.rankpill{font-family:var(--display);text-transform:uppercase;letter-spacing:.04em;font-size:14px;padding:4px 10px;border:1px solid var(--gold);color:var(--gold);border-radius:3px}
+.tape{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.tape b{font-family:var(--display);font-weight:400;font-size:18px;letter-spacing:0}
+.tape b small{color:var(--muted);font-size:12px}
+.tb{position:relative;height:10px;background:#221d1d;border-radius:2px}
+.tb i{position:absolute;inset:0 auto 0 0;width:var(--p);background:linear-gradient(90deg,var(--gold),#f1c766);border-radius:2px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.tape.opp .tb i{background:linear-gradient(90deg,#2b5f9e,#4f8fd6)}
+.tb em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--bone);margin-left:-1px}
+.fnbanner{display:flex;flex-direction:column;gap:3px;text-align:left;background:linear-gradient(120deg,#3a0c0f,#1a1212);border:1px solid var(--red);border-radius:4px;padding:12px 14px;color:var(--bone);cursor:pointer;animation:pulse2 2s infinite}
+.fnbanner b{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:20px}
+.fnbanner span:last-child{color:var(--gold);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+.ladder{display:flex;flex-wrap:wrap;gap:6px}
+.ladder span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+.ladder span.done{color:var(--bone);border-color:#4a3f3f}
+.ladder span.cur{color:#140f0f;background:var(--gold);border-color:var(--gold);font-weight:700}
+.fh{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--bone);text-align:left;cursor:pointer;font:inherit}
+.res{display:inline-block;width:22px;text-align:center;font-family:var(--display);font-weight:400;border-radius:2px;margin-right:6px}
+.res.W{background:var(--gold);color:#140f0f}.res.L{background:var(--red);color:#fff}.res.D{background:#555;color:#fff}
+.fn{position:fixed;inset:0;z-index:70;background:radial-gradient(ellipse at 50% 120%,#2a0d0f 0%,#0b0909 55%,#000 100%);color:var(--bone);display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.fn #fnCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.fnx{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:6}
+.fnbeams{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.2s}
+.fn.live .fnbeams{opacity:1}
+.fnbeams i{position:absolute;top:-10%;left:50%;width:38vw;height:130%;transform-origin:50% 0;background:linear-gradient(180deg,rgba(255,240,210,.22),rgba(255,240,210,0) 75%);filter:blur(8px);clip-path:polygon(45% 0,55% 0,100% 100%,0 100%)}
+.fnbeams i:nth-child(1){animation:beam 6s ease-in-out infinite alternate;margin-left:-19vw}
+.fnbeams i:nth-child(2){animation:beam 7.5s ease-in-out infinite alternate-reverse;margin-left:-19vw}
+.fnbeams i:nth-child(3){animation:beam 5s ease-in-out infinite alternate;margin-left:-19vw;background:linear-gradient(180deg,rgba(215,38,46,.25),rgba(215,38,46,0) 70%)}
+@keyframes beam{from{transform:rotate(-28deg)}to{transform:rotate(28deg)}}
+.fn.red{background:radial-gradient(ellipse at 50% 110%,#6a0f14 0%,#1a0707 55%,#000 100%)}
+.fn.blue{background:radial-gradient(ellipse at 50% 110%,#0f2c5a 0%,#070d1a 55%,#000 100%)}
+.fn.flash::after,.fn.gold::after{content:"";position:absolute;inset:0;background:#fff;pointer-events:none;animation:flash .5s ease-out forwards;z-index:4}
+.fn.gold::after{background:var(--gold)}
+@keyframes flash{from{opacity:.75}to{opacity:0}}
+.fnstage{position:relative;z-index:2;padding:0 24px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.fnmain{font-family:var(--display);text-transform:uppercase;font-size:clamp(44px,14vw,92px);line-height:.95;letter-spacing:.005em;text-shadow:0 4px 30px rgba(0,0,0,.6)}
+.fnmain span{display:inline-block;opacity:0;animation:word .6s cubic-bezier(.2,1.3,.4,1) both}
+.fnsub{color:var(--gold);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:14px;opacity:0}
+.fnsub.in{animation:rise .6s .35s ease-out both}
+#fnTop{color:var(--muted);letter-spacing:.3em}
+.fnskip{align-self:center;margin-top:3vh}
+.fntape{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2vh}
+.fntape div{display:flex;flex-direction:column;gap:4px;border-top:3px solid var(--gold);padding-top:8px}
+.fntape div:last-child{border-color:#4f8fd6}
+.fntape span{text-transform:uppercase;letter-spacing:.1em;font-size:12px;color:var(--muted)}
+.fntape b{font-family:var(--display);font-weight:400;font-size:34px}
+.fnmsg{margin:2vh 0 0;color:var(--bone);font-size:16px}
+.fnsp{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:5;transition:opacity 1s}
+.fnsp.gone{opacity:0;pointer-events:none}
+.fnstart{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.55);border:0;color:var(--bone);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:inherit}
+.fnstart b{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(40px,12vw,70px);line-height:.95;padding:0 20px}
+.fnstart span:last-child{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:13px}
+@media (prefers-reduced-motion: reduce){.fnbeams i{animation:none}.fn.flash::after,.fn.gold::after{animation:none;opacity:0}}
 </style>
 </head>
 <body>
@@ -540,12 +596,14 @@ async function pullAll(){
     else if (r.id.startsWith("d-")) days[r.id.slice(2)] = Object.assign({habits:{},meals:[],water:0}, r.body);
     lsSet(id, r.body);
   });
-  migrate(); setSync("db");
+  migrate(); setSync("db"); settleCareer();
   if (!data.length && lsGet("fc:profile")){ saveProfile(); Object.keys(days).forEach(k=>saveDay(k)); }
   await flushDirty();
   await refreshPhotoUrls();
   await pushState();
   render();
+  const pc = profile.career && profile.career.pending;
+  if (pc && !ui.fnShown && !document.getElementById("fn")){ ui.fnShown = true; setTimeout(()=>openFightNight("result", pc), 900); }
   if (!profile.notifSyncedAt || Date.now() - profile.notifSyncedAt > 6*3600e3) syncNotifs();
   if (profile.dailyWall && profile.dailyWall.on && Date.now() - (profile.dailyWall.at||0) > 12*3600e3) setTimeout(()=>prepareDailyWalls(false), 4000);
 }
@@ -811,6 +869,7 @@ function viewToday(){
   const icon = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>`;
   return `
   ${heroHTML()}
+  ${careerCardHTML()}
   ${needSetup ? `<section class="card"><h2>Remplis ton profil</h2><p class="muted small" style="margin:0">Âge, taille et poids suffisent pour calculer tes calories et protéines.</p><button class="btn red" data-act="go" data-tab="setup">Compléter mon profil</button></section>`:""}
   <section class="card">
     <div class="fightbar">
@@ -2718,7 +2777,7 @@ function handleRoute(){
   const g = q.get("go");
   if (g==="flex"){ trainSub = "flex"; tab = "train"; }
   else if (g==="train"){ trainSub = "prog"; tab = "train"; }
-  else if (g && ["today","food","weight","mind","setup"].includes(g)) tab = g;
+  else if (g && ["today","food","weight","mind","setup","career"].includes(g)) tab = g;
   if (g==="food") foodSub = "log";
   if (q.toString()) history.replaceState(null, "", location.pathname);
 }
@@ -2726,12 +2785,346 @@ navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", e
   if (e.data && e.data.type==="open"){ const u = new URL(e.data.url, location.href); history.replaceState(null,"", u.pathname + u.search); handleRoute(); render(); }
 });
 
+/* ---------- Mode Carrière : XP, combats de la semaine, classement ---------- */
+const RANKS = [["Amateur",0],["Régional",3],["Pro",6],["Top 15",10],["Top 5",14],["Challenger",19],["Champion",25]];
+const OPP_BASE = [650, 800, 950, 1050, 1150, 1250, 1350];
+const OPP_FIRST = ["Viktor","Malik","Dario","Sven","Ruben","Ilyes","Bastien","Kenzo","Nikola","Téo","Anselme","Yanis","Marco","Oskar","Rafael","Elias","Gaspard","Tariq","Lorenzo","Matvei"];
+const OPP_LAST = ["Moreau","Kovač","Duarte","Lindqvist","Baraka","Ferrand","Okafor","Valdés","Petrović","Laurent","Nakamura","Brandt","Costa","Mercier","Haddad","Rinaldi","Volkov","Achour"];
+const OPP_NICK = ["Le Bulldozer","La Faucheuse","Pitbull","Le Mur","Sniper","Le Boucher","Typhon","L'Enclume","Cobra","Le Marteau","Iceberg","La Tornade","Le Loup","Dynamite","Le Bourreau","Python"];
+const OPP_CITY = ["Marseille","Lyon","Liège","Genève","Lisbonne","Belgrade","Varsovie","Montréal","Casablanca","Dublin","Bordeaux","Lille","Naples","Göteborg"];
+const weekStart = (d=new Date()) => { const x = new Date(d); x.setHours(0,0,0,0); return addDays(x, -((x.getDay()+6)%7)); };
+const wkKey = d => dkey(weekStart(d));
+function career(){
+  if (!profile.career){ profile.career = {start: wkKey(), startDay: dkey(), pts:0, fights:[], name:"", nick:"", spotify:"", voice:true}; saveProfile(); }
+  return profile.career;
+}
+const rankIdx = pts => RANKS.reduce((a,[,p],i)=> pts>=p ? i : a, 0);
+function record(fs){ const c = fs || career().fights; return [c.filter(f=>f.res==="W").length, c.filter(f=>f.res==="L").length, c.filter(f=>f.res==="D").length]; }
+const fighterName = () => (career().name || "Hugo").trim();
+
+function dayXP(dk, noHot){
+  const d = days[dk] || {habits:{}, meals:[], water:0}, today = dkey(), past = dk < today;
+  const nowM = new Date().getHours()*60 + new Date().getMinutes(), t = targets(), it = [];
+  const add = (l, v) => { if (v) it.push([l, v]); };
+  if (dk > today) return {items:[], total:0};
+  if (notifCfg().defis) defiSlots(dk).forEach((s,j)=>{
+    const x = (d.defis||[]).find(y=>y.key===dk+"_"+j), lab = `${s.ex[1]}${s.ex[2]==="s"?" s":""} ${s.ex[0]}`;
+    if (x){ const fast = x.t && x.t - atTime(dk, s.time).getTime() <= 15*60e3; add(`Défi ${lab}${fast?" · rapide":""}`, fast ? 40 : 20); }
+    else if (past || nowM > toMin(s.time) + 120) add(`Défi raté · ${lab}`, -15);
+  });
+  (d.defis||[]).filter(x=>!/_\d+$/.test(x.key)).slice(0,3).forEach(x=>add(`Défi bonus · ${x.q} ${x.n}`, 20));
+  const meals = (d.meals||[]).filter(m=>!m.skipped), types = new Set(meals.map(m=>m.type||"x")), nm = Math.min(4, types.size);
+  add(`${nm} repas noté${nm>1?"s":""}`, nm*10);
+  const eaten = meals.reduce((a,m)=>a+(m.kcal||0),0);
+  if (t.kcal && types.size >= 2 && (past || nowM >= 21*60)){ const r = eaten/t.kcal; if (r>=.85 && r<=1.05) add("Calories dans la cible", 30); else if (r>1.15) add("Calories dépassées", -10); }
+  if ((d.water||0) >= t.water) add("Objectif d'eau", 15);
+  if (profile.weights.some(w=>w.d===dk)) add("Pesée", 10);
+  if ((d.stretch||[]).length) add("Souplesse", 20);
+  if (d.training && Object.values(d.training.logs||{}).some(l=>l && (l.kg||l.reps||l.feel))) add("Séance du coach", 50);
+  if (dayScore(dk) >= .8) add("Checklist à 80 %", 25);
+  if (!noHot && [1,2,3].every(i=>dayXP(dkey(addDays(parseKey(dk),-i)), true).total >= 150)) add("En feu : 3 jours à 150 XP", 10);
+  return {items:it, total: it.reduce((a,x)=>a+x[1],0)};
+}
+function weekDays(wk){ const c = career(), today = dkey(); return [...Array(7)].map((_,i)=>dkey(addDays(parseKey(wk),i))).filter(k=>k>=c.startDay && k<=today); }
+function countedDays(wk){ const c = career(); return [...Array(7)].map((_,i)=>dkey(addDays(parseKey(wk),i))).filter(k=>k>=c.startDay).length; }
+const weekXP = wk => weekDays(wk).reduce((a,k)=>a+dayXP(k).total, 0);
+function isTitleWeek(wk){ const g = profile.goalDate; return !!g && g >= wk && g <= dkey(addDays(parseKey(wk),6)); }
+function oppFor(wk, ri, lastRes){
+  const h = hash("opp:"+wk+":"+ri), r = (n,s) => (h >>> s) % n;
+  const n = countedDays(wk) || 7, title = isTitleWeek(wk);
+  const target = Math.round(OPP_BASE[ri] * n/7 * (lastRes==="L" ? .9 : 1) * (title ? 1.1 : 1) / 10) * 10;
+  return {first: OPP_FIRST[r(OPP_FIRST.length,0)], last: OPP_LAST[r(OPP_LAST.length,5)], nick: OPP_NICK[r(OPP_NICK.length,10)], city: OPP_CITY[r(OPP_CITY.length,15)],
+    w: 4 + ri*3 + r(5,20), l: r(5,24), target, title, rounds: title || ri>=5 ? 5 : 3};
+}
+function currentOpp(){ const c = career(), last = c.fights[c.fights.length-1]; return oppFor(wkKey(), rankIdx(c.pts), last && last.res); }
+function fightMethod(diff, h, rounds){
+  const R = ["premier","deuxième","troisième","quatrième","cinquième"], a = Math.abs(diff);
+  const subs = ["étranglement arrière","guillotine","clé de bras","triangle","kimura"];
+  if (a < .02) return {kind:"D", short:"Match nul", txt:"Match nul. Les juges n'ont pas pu vous départager"};
+  if (a >= .3){ const rd = 1 + h%2; return {kind:"KO", short:`KO · R${rd}`, txt:`par KO au ${R[rd-1]} round`, rd}; }
+  if (a >= .15){ const rd = 2 + h%2, s = subs[h%subs.length]; return {kind:"SUB", short:`Soumission · R${rd}`, txt:`par soumission, ${s}, au ${R[rd-1]} round`, rd}; }
+  if (a >= .06) return {kind:"DEC", short:"Décision unanime", txt:`par décision unanime, après ${rounds} rounds`, rd:rounds};
+  return {kind:"SPL", short:"Décision partagée", txt:`par décision partagée, après ${rounds} rounds`, rd:rounds};
+}
+function settleCareer(){
+  const c = career(), now = wkKey(); let changed = false;
+  let wk = c.lastSettled ? dkey(addDays(parseKey(c.lastSettled),7)) : c.start;
+  while (wk < now){
+    if (countedDays(wk)){
+      const last = c.fights[c.fights.length-1], ri = rankIdx(c.pts), opp = oppFor(wk, ri, last && last.res), me = weekXP(wk);
+      const diff = (me - opp.target) / Math.max(1, opp.target), m = fightMethod(diff, hash("m:"+wk), opp.rounds);
+      const res = m.kind==="D" ? "D" : diff > 0 ? "W" : "L";
+      const before = c.pts; c.pts = Math.max(0, c.pts + (res==="W" ? 3 : res==="D" ? 1 : -1));
+      c.fights.push({wk, opp, me, res, method:m, rankBefore: ri, rankAfter: rankIdx(c.pts), ptsBefore: before});
+      c.pending = wk;
+    }
+    c.lastSettled = wk; changed = true; wk = dkey(addDays(parseKey(wk),7));
+  }
+  if (changed) saveProfile();
+}
+
+function careerCardHTML(){
+  const c = career(), ri = rankIdx(c.pts), [W,L,D] = record(), opp = currentOpp(), me = weekXP(wkKey());
+  const today = dayXP(dkey()), hot = today.items.some(x=>x[0].startsWith("En feu"));
+  const n = countedDays(wkKey()) || 7, el = weekDays(wkKey()).length - 1 + (new Date().getHours()*60+new Date().getMinutes())/1440;
+  const oppNow = Math.round(opp.target * Math.min(1, el/n)), mx = Math.max(opp.target, me, 1);
+  const pend = c.pending && c.fights.find(f=>f.wk===c.pending);
+  return `<section class="card career">
+    ${pend ? `<button class="fnbanner" data-act="fightNight" data-v="${pend.wk}"><span class="kicker" style="color:var(--gold)">Fight Night</span><b>Le résultat de ton combat est tombé</b><span>Entrer dans l'arène ›</span></button>` : ""}
+    <div class="row between"><span class="kicker">${opp.title?"Combat pour le titre":"Combat de la semaine"} · ${opp.rounds} rounds</span><span class="rankpill">${RANKS[ri][0]}</span></div>
+    <div class="vs">
+      <div><div class="vsn">${esc(fighterName())}</div><div class="small muted">${W}-${L}-${D}</div></div>
+      <div class="vsx">VS</div>
+      <div style="text-align:right"><div class="vsn">${esc(opp.last)}</div><div class="small muted">« ${esc(opp.nick)} » · ${opp.w}-${opp.l}-0</div></div>
+    </div>
+    <div class="tape"><span>Toi</span><div class="tb"><i style="--p:${Math.min(100,me/mx*100)}%"></i></div><b>${fmt0(me)}</b></div>
+    <div class="tape opp"><span>Lui</span><div class="tb"><i style="--p:${Math.min(100,oppNow/mx*100)}%"></i><em style="left:${Math.min(100,opp.target/mx*100)}%"></em></div><b>${fmt0(oppNow)}<small>/${fmt0(opp.target)}</small></b></div>
+    <p class="small muted" style="margin:0">Dépasse <b style="color:var(--bone)">${fmt0(opp.target)} XP</b> d'ici dimanche soir pour gagner. Aujourd'hui : <b style="color:var(--gold)">${today.total>=0?"+":""}${today.total} XP</b>${hot?" · en feu":""}.</p>
+    <div class="row"><button class="btn sm" data-act="go" data-tab="career">Ma carrière</button><button class="btn sm red" data-act="walkout">Mon entrée</button></div>
+  </section>`;
+}
+
+function viewCareer(){
+  const c = career(), ri = rankIdx(c.pts), [W,L,D] = record(), t = dayXP(dkey()), opp = currentOpp();
+  const nxt = RANKS[ri+1];
+  return `
+  <section class="card career">
+    <div class="row between"><button class="btn sm ghost" data-act="go" data-tab="today">‹ Jour</button><span class="rankpill">${RANKS[ri][0]}</span></div>
+    <div class="vsn" style="font-size:44px">${esc(fighterName())}</div>
+    ${c.nick?`<div class="kicker" style="color:var(--gold)">« ${esc(c.nick)} »</div>`:""}
+    <div class="grid3">
+      <div class="stat"><span class="lbl">Palmarès</span><span class="num">${W}-${L}-${D}</span></div>
+      <div class="stat"><span class="lbl">Points</span><span class="num">${c.pts}</span></div>
+      <div class="stat"><span class="lbl">Prochain rang</span><span class="num" style="font-size:20px">${nxt?`${esc(nxt[0])}<small> à ${nxt[1]}</small>`:"Au sommet"}</span></div>
+    </div>
+    <div class="ladder">${RANKS.map(([n],i)=>`<span class="${i<ri?"done":i===ri?"cur":""}">${esc(n)}</span>`).join("")}</div>
+    <p class="small muted" style="margin:0">Victoire +3 points, nul +1, défaite −1. Après une défaite, ton adversaire suivant est un peu moins fort.</p>
+  </section>
+  <section class="card">
+    <div class="row between"><h2>XP du jour</h2><span class="num" style="color:var(--gold)">${t.total>=0?"+":""}${t.total}</span></div>
+    ${t.items.length ? `<div>${t.items.map(([l,v])=>`<div class="meal"><span>${esc(l)}</span><b style="color:${v<0?"var(--red)":"var(--gold)"}">${v>0?"+":""}${v}</b></div>`).join("")}</div>` : `<p class="small muted" style="margin:0">Rien pour l'instant. Note un repas ou valide un défi pour lancer la journée.</p>`}
+    <details class="small"><summary>Barème</summary><p class="muted" style="margin:6px 0 0">Défi validé +20 (+40 dans les 15 min) · Défi bonus +20 · Repas noté +10 · Calories dans la cible +30 · Eau +15 · Pesée +10 · Souplesse +20 · Séance du coach +50 · Checklist 80 % +25 · 3 jours d'affilée à 150 XP : +10 par jour · Défi raté −15 · Calories largement dépassées −10.</p></details>
+  </section>
+  <section class="card">
+    <h2>Ton entrée</h2>
+    <label class="f" for="cr_name">Nom de combattant<input id="cr_name" data-cr="name" value="${esc(c.name)}" placeholder="Hugo"></label>
+    <label class="f" for="cr_nick">Surnom<input id="cr_nick" data-cr="nick" value="${esc(c.nick)}" placeholder="Ex : Le Cutter"></label>
+    <label class="f" for="cr_sp">Musique d'entrée (lien Spotify)<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://open.spotify.com/track/…" inputmode="url"></label>
+    <p class="small muted" style="margin:0">Dans Spotify : ⋯ sur ton son › Partager › Copier le lien, puis colle-le ici. Sans compte Spotify connecté dans le navigateur, c'est un extrait de 30 s qui joue (assez pour l'entrée). Sans lien, l'app joue un beat d'arène.</p>
+    <label class="row small" for="cr_voice" style="gap:8px"><input type="checkbox" id="cr_voice" data-cr-check="voice" ${c.voice!==false?"checked":""} style="width:auto"> Voix de l'annonceur</label>
+    <div class="row"><button class="btn red" data-act="walkout">Lancer mon entrée</button><button class="btn" data-act="fightTest">Simuler le combat de la semaine</button></div>
+  </section>
+  <section class="card">
+    <h2>Historique des combats</h2>
+    ${c.fights.length ? `<div>${c.fights.slice().reverse().map(f=>`<button class="meal fh" data-act="fightNight" data-v="${f.wk}"><span><b class="res ${f.res}">${f.res==="W"?"V":f.res==="L"?"D":"N"}</b> vs ${esc(f.opp.first)} ${esc(f.opp.last)}<br><span class="small muted">Semaine du ${parseKey(f.wk).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${esc(f.method.short)} · ${fmt0(f.me)} / ${fmt0(f.opp.target)} XP</span></span><span class="small muted">Revoir ›</span></button>`).join("")}</div>`
+      : `<p class="small muted" style="margin:0">Ton premier combat se joue cette semaine contre ${esc(opp.first)} « ${esc(opp.nick)} » ${esc(opp.last)}. Résultat dimanche soir, Fight Night à ta prochaine ouverture de l'app.</p>`}
+  </section>`;
+}
+
+/* ---------- Fight Night : son, voix, lumières ---------- */
+const fx = {ctx:null};
+function fxInit(){
+  if (fx.ctx) return; const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+  fx.ctx = new C(); fx.out = fx.ctx.createGain(); fx.out.gain.value = .9; fx.out.connect(fx.ctx.destination);
+  const c = fx.ctx, len = c.sampleRate*4, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0;
+  for (let i=0;i<len;i++){ const w = Math.random()*2-1; l = (l + .02*w)/1.02; d[i] = l*3.2 + w*.12; }
+  fx.noise = b;
+}
+function fxNoise(){ const s = fx.ctx.createBufferSource(); s.buffer = fx.noise; s.loop = true; return s; }
+function crowdStart(){
+  if (!fx.ctx || fx.crowd) return; const c = fx.ctx;
+  const s = fxNoise(), bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = .5;
+  const s2 = fxNoise(), hp = c.createBiquadFilter(); hp.type = "bandpass"; hp.frequency.value = 2600; hp.Q.value = 1.2;
+  const g = c.createGain(); g.gain.value = 0; const g2 = c.createGain(); g2.gain.value = .25;
+  const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = .23; lg.gain.value = .25; lfo.connect(lg); lg.connect(g2.gain);
+  s.connect(bp); bp.connect(g); s2.connect(hp); hp.connect(g2); g2.connect(g); g.connect(fx.out);
+  s.start(); s2.start(); lfo.start(); fx.crowd = g; crowdLevel(.28, 2);
+}
+function crowdLevel(v, t=1){ if (!fx.crowd) return; const n = fx.ctx.currentTime; fx.crowd.gain.cancelScheduledValues(n); fx.crowd.gain.setValueAtTime(fx.crowd.gain.value, n); fx.crowd.gain.linearRampToValueAtTime(v, n+t); }
+function roar(peak=.9, back=.28){ crowdLevel(peak, .35); clearTimeout(fx.rt); fx.rt = setTimeout(()=>crowdLevel(back, 2.5), 1600); }
+function boom(){
+  if (!fx.ctx) return; const c = fx.ctx, n = c.currentTime;
+  const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(120, n); o.frequency.exponentialRampToValueAtTime(32, n+.9);
+  g.gain.setValueAtTime(1, n); g.gain.exponentialRampToValueAtTime(.001, n+1.2); o.connect(g); g.connect(fx.out); o.start(n); o.stop(n+1.3);
+  const s = fxNoise(), lp = c.createBiquadFilter(), g2 = c.createGain(); lp.type = "lowpass"; lp.frequency.value = 500;
+  g2.gain.setValueAtTime(.8, n); g2.gain.exponentialRampToValueAtTime(.001, n+.35); s.connect(lp); lp.connect(g2); g2.connect(fx.out); s.start(n); s.stop(n+.4);
+}
+function bell(times=3){
+  if (!fx.ctx) return; const c = fx.ctx;
+  for (let k=0;k<times;k++){ const n = c.currentTime + k*.34;
+    [[523,1],[1243,.55],[2093,.32],[3150,.16]].forEach(([f,a])=>{ const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, n); g.gain.exponentialRampToValueAtTime(.32*a, n+.005); g.gain.exponentialRampToValueAtTime(.0005, n+2.4);
+      o.connect(g); g.connect(fx.out); o.start(n); o.stop(n+2.5); }); }
+}
+function riser(sec=3){
+  if (!fx.ctx) return; const c = fx.ctx, n = c.currentTime, s = fxNoise(), bp = c.createBiquadFilter(), g = c.createGain();
+  bp.type = "bandpass"; bp.Q.value = 3; bp.frequency.setValueAtTime(250, n); bp.frequency.exponentialRampToValueAtTime(5000, n+sec);
+  g.gain.setValueAtTime(.0001, n); g.gain.exponentialRampToValueAtTime(.45, n+sec); g.gain.linearRampToValueAtTime(0, n+sec+.05);
+  s.connect(bp); bp.connect(g); g.connect(fx.out); s.start(n); s.stop(n+sec+.1);
+}
+function arenaBeat(sec=40){
+  if (!fx.ctx) return; const c = fx.ctx, t0 = c.currentTime + .05, bt = 60/92, g = c.createGain(); g.gain.value = .75; g.connect(fx.out); fx.beat = g;
+  const bass = [55, 55, 65.4, 49];
+  for (let i=0; i*bt < sec; i++){ const n = t0 + i*bt;
+    const o = c.createOscillator(), k = c.createGain(); o.frequency.setValueAtTime(140, n); o.frequency.exponentialRampToValueAtTime(42, n+.22);
+    k.gain.setValueAtTime(.9, n); k.gain.exponentialRampToValueAtTime(.001, n+.3); o.connect(k); k.connect(g); o.start(n); o.stop(n+.32);
+    if (i%2){ const s = fxNoise(), hp = c.createBiquadFilter(), h = c.createGain(); hp.type = "highpass"; hp.frequency.value = 1800;
+      h.gain.setValueAtTime(.35, n); h.gain.exponentialRampToValueAtTime(.001, n+.18); s.connect(hp); hp.connect(h); h.connect(g); s.start(n); s.stop(n+.2); }
+    const b = c.createOscillator(), bl = c.createBiquadFilter(), bg = c.createGain(); b.type = "sawtooth"; b.frequency.value = bass[Math.floor(i/4)%4];
+    bl.type = "lowpass"; bl.frequency.value = 260; bg.gain.setValueAtTime(.18, n); bg.gain.exponentialRampToValueAtTime(.001, n+bt*.95);
+    b.connect(bl); bl.connect(bg); bg.connect(g); b.start(n); b.stop(n+bt);
+  }
+}
+function beatStop(){ if (fx.beat){ const n = fx.ctx.currentTime; fx.beat.gain.setValueAtTime(fx.beat.gain.value, n); fx.beat.gain.linearRampToValueAtTime(0, n+1.5); fx.beat = null; } }
+function fxClose(){ try{ speechSynthesis.cancel(); }catch(e){} if (fx.ctx){ fx.ctx.close().catch(()=>{}); } fx.ctx = null; fx.crowd = null; fx.beat = null; }
+
+function frVoice(){ const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || []; return vs.find(v=>/^fr/i.test(v.lang) && /thomas|daniel|nicolas/i.test(v.name)) || vs.find(v=>/^fr/i.test(v.lang)) || null; }
+function say(text, o={}){
+  return new Promise(res=>{
+    if (!fn.on) return res();
+    const fallback = 900 + text.length*60;
+    if (career().voice === false || !window.speechSynthesis) return setTimeout(res, fallback);
+    const u = new SpeechSynthesisUtterance(text), v = frVoice(); if (v) u.voice = v;
+    u.lang = "fr-FR"; u.rate = o.rate || .86; u.pitch = o.pitch || .6; u.volume = 1;
+    let done = false; const fin = () => { if (!done){ done = true; res(); } };
+    u.onend = fin; u.onerror = fin; setTimeout(fin, 2500 + text.length*120);
+    speechSynthesis.speak(u);
+  });
+}
+const wait = ms => new Promise(r=>setTimeout(r, ms));
+
+function spotifyUri(s){ const m = String(s||"").match(/(track|album|playlist)[/:]([A-Za-z0-9]{22})/); return m ? `spotify:${m[1]}:${m[2]}` : null; }
+let spApiP = null;
+function loadSpotify(){
+  if (spApiP) return spApiP;
+  spApiP = new Promise(res=>{ window.onSpotifyIframeApiReady = api => res(api); const s = document.createElement("script"); s.src = "https://open.spotify.com/embed/iframe-api/v1"; s.async = true; s.onerror = () => { spApiP = null; res(null); }; document.head.appendChild(s); setTimeout(()=>res(null), 9000); });
+  return spApiP;
+}
+
+const fn = {on:false};
+function openFightNight(mode, wk){
+  const c = career();
+  let f = null;
+  if (mode==="result"){ f = c.fights.find(x=>x.wk===wk); if (!f) return; }
+  if (mode==="test"){ const last = c.fights[c.fights.length-1], ri = rankIdx(c.pts), opp = oppFor(wkKey(), ri, last && last.res), me = weekXP(wkKey());
+    const diff = (me - opp.target)/Math.max(1,opp.target), m = fightMethod(diff, hash("m:"+wkKey()), opp.rounds);
+    f = {wk:wkKey(), opp, me, res: m.kind==="D" ? "D" : diff>0 ? "W" : "L", method:m, rankBefore:ri, rankAfter:ri, test:true}; }
+  Object.assign(fn, {on:true, mode, f, run: (fn.run||0)+1, sp:null});
+  const el = document.createElement("div"); el.id = "fn"; el.className = "fn";
+  el.innerHTML = `<canvas id="fnCv" aria-hidden="true"></canvas><div class="fnbeams" aria-hidden="true"><i></i><i></i><i></i></div>
+    <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
+    <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div></div>
+    <div class="fnsp" id="fnSpWrap"><div id="fnSp"></div></div>
+    <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
+  document.body.appendChild(el); document.body.style.overflow = "hidden";
+  const uri = spotifyUri(c.spotify);
+  if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
+  if (window.speechSynthesis) speechSynthesis.getVoices();
+}
+function closeFightNight(){
+  fn.on = false; fn.run++; fxClose(); try{ fn.sp && fn.sp.pause(); }catch(e){}
+  const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
+  const c = career(); if (fn.mode==="result" && c.pending){ c.pending = null; saveProfile(); }
+  render();
+}
+function fnText(main, sub="", top=""){
+  const m = document.getElementById("fnMain"); if (!m) return;
+  document.getElementById("fnTop").textContent = top;
+  m.innerHTML = String(main).split(" ").map((w,i)=>`<span style="animation-delay:${i*90}ms">${esc(w)}</span>`).join(" ");
+  const s = document.getElementById("fnSub"); s.textContent = sub; s.classList.remove("in"); void s.offsetWidth; s.classList.add("in");
+  document.getElementById("fnExtra").innerHTML = "";
+}
+function fnFlash(cls="flash"){ const el = document.getElementById("fn"); if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+function confetti(){
+  const cv = document.getElementById("fnCv"); if (!cv) return; const dpr = Math.min(2, devicePixelRatio||1);
+  cv.width = innerWidth*dpr; cv.height = innerHeight*dpr; const g = cv.getContext("2d"); g.scale(dpr,dpr);
+  const ps = [...Array(140)].map(()=>({x: Math.random()*innerWidth, y: -20 - Math.random()*innerHeight*.6, vx:(Math.random()-.5)*2, vy: 2+Math.random()*3.5, r: Math.random()*6.28, vr:(Math.random()-.5)*.3, c: ["#d9a43a","#efe7dc","#d7262e"][Math.floor(Math.random()*3)], w: 5+Math.random()*7}));
+  const run = fn.run, t0 = performance.now();
+  const step = now => { if (!fn.on || fn.run!==run) return; g.clearRect(0,0,innerWidth,innerHeight);
+    ps.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; g.save(); g.translate(p.x,p.y); g.rotate(p.r); g.fillStyle=p.c; g.fillRect(-p.w/2,-p.w/4,p.w,p.w/2); g.restore(); });
+    if (now - t0 < 6000) requestAnimationFrame(step); else g.clearRect(0,0,innerWidth,innerHeight); };
+  requestAnimationFrame(step);
+}
+async function runFightNight(){
+  const run = fn.run, alive = () => fn.on && fn.run === run, c = career(), f = fn.f;
+  document.getElementById("fnStart")?.remove();
+  fxInit(); try{ fx.ctx && fx.ctx.resume(); }catch(e){}
+  if (window.speechSynthesis){ const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } // débloque la voix sur iPhone
+  const ri = f ? f.rankBefore : rankIdx(c.pts), [W,L,D] = f && !f.test ? record(c.fights.slice(0, c.fights.indexOf(f))) : record();
+  const opp = f ? f.opp : currentOpp(), name = fighterName(), nick = c.nick ? c.nick.trim() : "";
+  const el = document.getElementById("fn"); el.classList.add("live");
+
+  // 1. L'entrée : musique + foule
+  crowdStart();
+  const hasSp = !!fn.sp;
+  if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
+  fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
+  document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
+  fn.skip = false;
+  for (let i=0;i<28 && !fn.skip;i++){ await wait(500); if (!alive()) return; if (i===6) roar(.6,.4); if (i===16) fnText(RANKS[ri][0].toUpperCase(), `${W} victoire${W>1?"s":""} · ${L} défaite${L>1?"s":""}${profile.weightClass?" · "+profile.weightClass:""}`, "Entrée dans l'arène"); }
+  if (hasSp){ try{ fn.sp.pause(); }catch(e){} } else beatStop();
+  document.getElementById("fnSpWrap")?.classList.add("gone");
+  if (!alive()) return;
+
+  // 2. L'annonceur
+  crowdLevel(.18, 1.5); riser(2.6); fnText("Mesdames et messieurs", "", "Main event"); await wait(400);
+  await say("Mesdames et messieurs...", {rate:.78, pitch:.55}); if (!alive()) return;
+  boom(); fnFlash(); roar();
+  fnText(fn.mode==="walkout" ? "Main event de la semaine" : opp.title ? "Combat pour le titre" : "Main event", `${opp.rounds} rounds`, "Fight Camp");
+  await say(opp.title ? `Ce combat est prévu pour ${opp.rounds} rounds... et il est pour le titre !` : `Bienvenue au main event de la semaine ! Un combat prévu pour ${opp.rounds} rounds !`); if (!alive()) return;
+  await wait(500);
+  fnText(`${opp.first} ${opp.last}`, `« ${opp.nick} » · ${opp.w}-${opp.l}-0 · ${opp.city}`, "Coin bleu"); el.classList.add("blue"); boom();
+  await say(`Dans le coin bleu... venu de ${opp.city}... avec un palmarès de ${opp.w} victoires et ${opp.l} défaites... ${opp.nick}... ${opp.first} ${opp.last} !`); if (!alive()) return;
+  roar(.55,.25); await wait(900); el.classList.remove("blue"); if (!alive()) return;
+  riser(2.2); await wait(1600); if (!alive()) return;
+  fnText(name, `${nick?`« ${nick} » · `:""}${W}-${L}-${D} · ${RANKS[ri][0]}`, "Coin rouge"); el.classList.add("red"); boom(); fnFlash();
+  await say(`Et dans le coin rouge... ${profile.weightClass?`combattant de la catégorie des ${profile.weightClass}...`:""} classé ${RANKS[ri][0]}... avec un palmarès de ${W} victoire${W>1?"s":""} et ${L} défaite${L>1?"s":""}...${nick?` ${nick}...`:""}`, {rate:.82}); if (!alive()) return;
+  await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); if (!alive()) return;
+  await wait(1800); el.classList.remove("red"); if (!alive()) return;
+
+  if (fn.mode==="walkout"){
+    const me = weekXP(wkKey());
+    fnText("Le combat continue", `${fmt0(me)} XP pour toi · ${fmt0(opp.target)} XP à battre d'ici dimanche`, "Cette semaine");
+    await say(me >= opp.target ? "Tu mènes le combat. Ne lâche rien." : `Il te manque ${fmt0(opp.target - me)} points d'expérience. Au travail.`);
+    crowdLevel(.12, 3);
+    document.getElementById("fnExtra").innerHTML = `<div class="row" style="justify-content:center"><button class="btn red" data-act="fnClose">Au travail</button></div>`;
+    return;
+  }
+
+  // 3. Le combat et le verdict
+  bell(3); fnText("Combat", "", "Round 1"); await wait(2600); if (!alive()) return;
+  document.getElementById("fnExtra").innerHTML = `<div class="fntape"><div><span>${esc(name)}</span><b data-to="${f.me}">0</b></div><div><span>${esc(opp.last)}</span><b data-to="${opp.target}">0</b></div></div>`;
+  document.querySelectorAll(".fntape b").forEach(b=>{ const to = +b.dataset.to, t0 = performance.now(); const st = now => { const k = Math.min(1,(now-t0)/2200); b.textContent = fmt0(to*(1-Math.pow(1-k,3))) + " XP"; if (k<1 && alive()) requestAnimationFrame(st); }; requestAnimationFrame(st); });
+  crowdLevel(.5, 2); await wait(2600); if (!alive()) return;
+  bell(2); crowdLevel(.15, 1);
+  const win = f.res==="W", draw = f.res==="D", m = f.method;
+  fnText(m.kind==="KO" ? "Arrêt de l'arbitre" : m.kind==="SUB" ? "Il a tapé" : "Décision des juges", "", "Fin du combat");
+  await say("Mesdames et messieurs...", {rate:.8}); if (!alive()) return;
+  if (m.kind==="DEC" || m.kind==="SPL" || draw) await say(`après ${m.rd || opp.rounds} rounds... les juges ont rendu leur décision.`);
+  else await say(`l'arbitre arrête le combat au ${["premier","deuxième","troisième","quatrième","cinquième"][(m.rd||1)-1]} round.`);
+  if (!alive()) return; riser(2.4); await wait(1800); if (!alive()) return;
+  if (draw){ fnText("Match nul", "Personne ne repart avec la victoire", ""); await say("Ce combat se termine sur un match nul !"); }
+  else {
+    const winner = win ? name : `${opp.first} ${opp.last}`;
+    await say("Et le vainqueur...", {rate:.75}); if (!alive()) return;
+    boom(); fnFlash(win ? "gold" : "flash");
+    fnText(winner, `${m.txt.charAt(0).toUpperCase()+m.txt.slice(1)}`, win ? (f.rankAfter>f.rankBefore ? "Nouveau rang : "+RANKS[f.rankAfter][0] : "Victoire") : "Défaite");
+    if (win){ roar(1, .4); confetti(); } else crowdLevel(.35, .6);
+    await say(`${m.txt}... ${win ? (f.rankAfter===6 && f.rankBefore<6 ? `et nouveau champion... ${name} !` : name + " !") : `${opp.nick}... ${opp.first} ${opp.last}.`}`, {rate:.8});
+  }
+  if (!alive()) return;
+  const msg = win ? (f.rankAfter>f.rankBefore ? `Tu passes ${RANKS[f.rankAfter][0]}.` : "Garde ce rythme la semaine prochaine.")
+    : draw ? "Une semaine de plus pour faire la différence." : "Ton prochain adversaire sera un peu moins fort. Relève-toi.";
+  document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">${esc(msg)} ${fmt0(f.me)} XP contre ${fmt0(opp.target)}.</p><div class="row" style="justify-content:center"><button class="btn" data-act="fnReplay">Revoir</button><button class="btn red" data-act="fnClose">Continuer</button></div>`;
+  if (!win) await say(msg);
+}
+
 /* ---------- Rendu ---------- */
 function render(){
   $("#hdate").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
   document.querySelectorAll("#nav button").forEach(b=> b.dataset.tab===tab ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
   const v = $("#view");
-  v.innerHTML = tab==="today" ? viewToday() : tab==="food" ? viewFood() : tab==="weight" ? viewWeight() : tab==="mind" ? viewMind() : tab==="train" ? viewTraining() : viewSetup();
+  v.innerHTML = tab==="today" ? viewToday() : tab==="food" ? viewFood() : tab==="weight" ? viewWeight() : tab==="mind" ? viewMind() : tab==="train" ? viewTraining() : tab==="career" ? viewCareer() : viewSetup();
 
   const seed = Math.floor(Date.now()/864e5) + quoteOffset;
   ["pc","pm"].forEach(id=>{ const c=document.getElementById(id); if(c) drawPoster(c, seed); });
@@ -2777,6 +3170,13 @@ document.addEventListener("click", async e=>{
     case "planSkip": { const p = (profile.plan||[]).find(x=>x.id===b.dataset.id); if (p){ p.ex = (p.ex||[]).concat(b.dataset.d); saveProfile(); scheduleNotifSync(); render(); toast("Séance sautée"); } break; }
     case "icsExport": try{ await downloadsCap.save({filename:"fight-camp-seances.ics", data:new Blob([icsText()], {type:"text/calendar"})}); }catch(err){} break;
     case "defiNow": openDefi(null); break;
+    case "walkout": openFightNight("walkout"); break;
+    case "fightTest": openFightNight("test"); break;
+    case "fightNight": openFightNight("result", b.dataset.v); break;
+    case "fnGo": runFightNight(); break;
+    case "fnSkip": fn.skip = true; break;
+    case "fnClose": closeFightNight(); break;
+    case "fnReplay": { const m = fn.mode, w = fn.f && fn.f.wk; closeFightNight(); openFightNight(m, w); break; }
     case "defiTap": if (navigator.vibrate) navigator.vibrate(15); defi.count++; paintDefi(); break;
     case "defiRun": defi.run = !defi.run; clearInterval(defi.tm); if (defi.run){ try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} defi.tm = setInterval(()=>{ defi.left--; if (defi.left<=3 && defi.left>0) beep(660,90); if (defi.left<=0){ clearInterval(defi.tm); beep(1200,300); } paintDefi(); }, 1000); } paintDefi(); break;
     case "defiDone": finishDefi(); break;
@@ -2878,6 +3278,8 @@ document.addEventListener("click", async e=>{
 
 document.addEventListener("change", async e=>{
   const el = e.target;
+  if (el.dataset.cr){ career()[el.dataset.cr] = el.value.trim(); saveProfile(); if (el.dataset.cr==="spotify" && el.value && !spotifyUri(el.value)) toast("Lien Spotify non reconnu"); return; }
+  if (el.dataset.crCheck){ career()[el.dataset.crCheck] = el.checked; saveProfile(); return; }
   if (el.dataset.habit){ day().habits[el.dataset.habit] = el.checked; saveDay();
     const done = profile.habits.filter(h=>day().habits[h.id]).length;
     if (el.checked && done === profile.habits.length) toast("Journée gagnée. Round suivant demain.");
