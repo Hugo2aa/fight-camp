@@ -444,6 +444,44 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 
 .audbox{display:flex;flex-direction:column;gap:10px;padding:16px;border:2px solid var(--gold);border-radius:6px;background:#0b0909}
 .audbox input[type=range]{width:100%;accent-color:var(--gold)}
+
+.fnscene{display:flex;justify-content:center}
+.fnscene:empty{display:none}
+.fnscene .art.in{animation:rise .6s ease-out both}
+.flag{width:min(62vw,300px);border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.flag.wave{animation:flagw 2.4s ease-in-out infinite alternate;transform-origin:left center}
+@keyframes flagw{from{transform:perspective(600px) rotateY(-14deg) skewY(-2deg)}to{transform:perspective(600px) rotateY(10deg) skewY(2deg)}}
+.art-ruler{width:14px;height:34vh;max-height:260px;background:rgba(255,255,255,.08);border-radius:7px;position:relative;overflow:hidden}
+.art-ruler i{position:absolute;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,var(--gold) 0 3px,transparent 3px 14px),linear-gradient(0deg,rgba(217,164,58,.5),rgba(217,164,58,.15));animation:grow 1.2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{height:0}to{height:100%}}
+.art-scale,.art-age{display:flex;align-items:baseline;gap:8px;font-family:var(--display)}
+.art-scale b,.art-age b{font-weight:400;font-size:clamp(70px,24vw,140px);line-height:.9;color:var(--gold)}
+.art-scale span,.art-age span{font-size:30px;text-transform:uppercase}
+.art-rec{display:flex;gap:14px}
+.art-rec div{display:flex;flex-direction:column;align-items:center;gap:6px}
+.art-rec b{font-family:var(--display);font-weight:400;font-size:clamp(60px,20vw,110px);line-height:1;background:#141010;border:2px solid #3a3030;border-radius:6px;padding:4px 18px;animation:flip .6s cubic-bezier(.2,1.3,.4,1) both}
+.art-rec span{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+@keyframes flip{from{transform:rotateX(90deg);opacity:0}to{transform:none;opacity:1}}
+.art-final{display:flex;flex-direction:column;align-items:center;font-family:var(--display);text-transform:uppercase;line-height:.85;animation:slam .5s cubic-bezier(.2,1.4,.4,1) both}
+.art-final b{font-weight:400;font-size:clamp(80px,26vw,160px)}
+.art-final b:last-child{color:var(--red)}
+@keyframes slam{from{transform:scale(2.4);opacity:0;filter:blur(8px)}to{transform:none;opacity:1;filter:none}}
+.fn.sc-blue{background:radial-gradient(ellipse at 50% 110%,#0f2c5a 0%,#070d1a 55%,#000 100%)}
+.fn.sc-red{background:radial-gradient(ellipse at 50% 110%,#6a0f14 0%,#1a0707 55%,#000 100%)}
+.fn.sc-gold{background:radial-gradient(ellipse at 50% 100%,#5a4110 0%,#140f05 55%,#000 100%)}
+.fn.sc-dim .fnbeams,.fn.sc-black .fnbeams{opacity:.25}
+.fn.sc-black{background:#000}
+.fn.sc-black .fnmain{animation:pulseTxt 1.1s ease-in-out infinite}
+@keyframes pulseTxt{50%{transform:scale(1.06)}}
+.fn.sc-flagbg{background:radial-gradient(ellipse at 50% 40%,#2a2626 0%,#0b0909 60%,#000 100%)}
+.fn.sc-name{background:radial-gradient(ellipse at 50% 60%,#0f3a7a 0%,#06101f 55%,#000 100%)}
+.fn.sc-name .fnmain{color:#fff;text-shadow:0 0 18px #4fa3ff,0 0 50px rgba(79,163,255,.7)}
+.fn.sc-name #fnTop{color:#8fc4ff;letter-spacing:.2em}
+.fn.sc-final{background:radial-gradient(ellipse at 50% 100%,#7a1015 0%,#1d0606 50%,#000 100%)}
+.pyro{position:absolute;inset:0;pointer-events:none;z-index:1}
+.pyro i{position:absolute;bottom:0;width:6px;height:46vh;background:linear-gradient(0deg,rgba(255,210,120,0),#ffd27a 30%,#fff 60%,rgba(255,255,255,0));filter:blur(1px);animation:pyro 1.6s ease-out both;transform-origin:bottom}
+@keyframes pyro{0%{transform:scaleY(0);opacity:0}15%{opacity:1}60%{transform:scaleY(1);opacity:.9}100%{transform:scaleY(1.05);opacity:0}}
+.fiche summary{cursor:pointer;list-style:none}
 </style>
 </head>
 <body>
@@ -2977,6 +3015,11 @@ function viewCareer(){
     ${c.audio && c.audio.path && ytId(c.yt) ? `<p class="small muted" style="margin:0">Le fichier audio passe en priorité sur la vidéo.</p>` : ""}
     <div class="row between"><span class="small muted">${!annSrc() ? "Ajoute un fichier ou un lien, puis cale le timing." : c.ytCues&&c.ytCues.length ? `${c.ytCues.length} impact${c.ytCues.length>1?"s":""} calé${c.ytCues.length>1?"s":""} · de ${fmtS(c.ytStart||0)} à ${c.ytEnd?fmtS(c.ytEnd):"la fin"}` : "Pas encore calée : les textes changeront à intervalles réguliers."}</span><button class="btn sm red" data-act="ytCal">Caler le timing</button></div>
     <p class="small muted" style="margin:0">L'annonce passe juste après ton entrée (la vidéo sur un écran géant). Les flashs et les textes tombent aux moments que tu as calés. Ensuite, la voix de l'app annonce ton nom.</p>
+    <details class="fiche" ${c.trame!==false && !c.fiche ? "open" : ""}><summary><b>Ta fiche de présentation</b> <span class="small muted">· une scène par phrase de l'annonce</span></summary>
+      <label class="row small" for="cr_trame" style="gap:8px;margin:8px 0"><input type="checkbox" id="cr_trame" data-cr-check="trame" ${c.trame!==false?"checked":""} style="width:auto"> Utiliser ma trame (drapeaux, taille, poids, palmarès…)</label>
+      <div class="grid2">${[["full","Nom complet"],["nick","Surnom"],["corner","Coin (bleu ou rouge)"],["height","Taille"],["weight","Poids"],["rep","Représente"],["born","Né à"],["age","Âge"],["rec","Palmarès pro"]].map(([k,l])=>`<label class="f" for="fi_${k}">${l}<input id="fi_${k}" data-fi="${k}" value="${esc(fiche()[k])}"></label>`).join("")}</div>
+      <p class="small muted" style="margin:0">Drapeaux reconnus : Corse, Russie, France, Italie. Les 13 scènes suivent l'ordre de ta trame : Ladies and gentlemen › Main event › And now › Coin › Taille › Poids › Représente › Né à › Âge › Palmarès › He is › Nom › Final.</p>
+    </details>
     <h3>3. Le combat du week-end</h3>
     <div class="chips">${[[5,"MMA · rounds de 5 min"],[3,"Boxe · rounds de 3 min"]].map(([v,l])=>`<button class="chip ${(c.roundMin||5)===v?"on":""}" data-act="roundMin" data-v="${v}">${l}</button>`).join("")}</div>
     <p class="small muted" style="margin:0">3 rounds (5 pour un combat pour le titre), 1 min de repos entre chaque. Pas de combat le week-end = défaite par forfait le lundi.</p>
@@ -3082,7 +3125,7 @@ function openFightNight(mode, wk, trial){
   const el = document.createElement("div"); el.id = "fn"; el.className = "fn";
   el.innerHTML = `<canvas id="fnCv" aria-hidden="true"></canvas><div class="fnbeams" aria-hidden="true"><i></i><i></i><i></i></div>
     <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
-    <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div><div id="fnSh" class="sh"></div></div>
+    <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnScene" class="fnscene"></div><div id="fnExtra"></div><div id="fnSh" class="sh"></div></div>
     <div class="fnsp" id="fnSpWrap">${ytId(c.spotify) ? `<div class="fnmus"><div id="fnMus"></div></div>` : `<div id="fnSp"></div>`}</div>
     ${annSrc()==="yt" ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
     <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":mode==="fight"?(trial?"Essai du combat":"Combat du week-end"):"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
@@ -3173,10 +3216,12 @@ async function runFightNight(){
   roar(.55,.25); await wait(900); el.classList.remove("blue"); if (!alive()) return;
   riser(2.2); await wait(1600); if (!alive()) return;
   }
+  if (!(fn.yt && useTrame())){
   fnText(name, `${nick?`« ${nick} » · `:""}${W}-${L}-${D} · ${RANKS[ri][0]}`, "Coin rouge"); el.classList.add("red"); boom(); fnFlash();
   await say(`Et dans le coin rouge... ${profile.weightClass?`combattant de la catégorie des ${profile.weightClass}...`:""} classé ${RANKS[ri][0]}... avec un palmarès de ${W} victoire${W>1?"s":""} et ${L} défaite${L>1?"s":""}...${nick?` ${nick}...`:""}`, {rate:.82}); if (!alive()) return;
   await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); if (!alive()) return;
   await wait(1800); el.classList.remove("red"); if (!alive()) return;
+  }
 
   if (fn.mode==="fight"){
     const done = await shadowRounds(alive, el, opp); if (!alive()) return;
@@ -3226,6 +3271,63 @@ async function runFightNight(){
 
 
 
+
+/* ---------- Trame de présentation : une scène différente à chaque impact ---------- */
+const FICHE_DEF = {full:"Hugo Mastrogiovanni", nick:"The Blue Eyes", corner:"bleu", height:"5'11\"", weight:"170 lbs", rep:"Corse", born:"Moscou, Russie", age:"20", rec:"0-0-0"};
+function fiche(){ const c = career(); c.fiche = Object.assign({}, FICHE_DEF, c.fiche||{}); if (c.trame === undefined) c.trame = true; return c.fiche; }
+function toCm(h){ const m = String(h).match(/(\d)\s*['’]\s*(\d{1,2})?/); if (m) return Math.round((+m[1]*12 + (+m[2]||0)) * 2.54); const n = parseFloat(String(h).replace(",", ".")); return n > 100 ? Math.round(n) : n > 1 && n < 2.5 ? Math.round(n*100) : null; }
+function toKg(w){ const n = parseFloat(String(w).replace(",", ".")); if (!n) return null; return /lb/i.test(w) ? Math.round(n*0.4536*10)/10 : n; }
+const FLAGS = {
+  corse: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="300" height="200" fill="#fff"/><path fill="#111" d="M130 38 C166 28 197 50 199 86 C201 110 192 125 182 133 L184 160 C184 168 178 173 170 173 L142 173 C135 173 131 168 131 162 L131 149 C123 149 118 145 118 140 C114 138 114 133 117 130 C113 128 113 123 117 121 L113 114 C109 110 108 106 112 102 L116 91 C112 85 112 79 116 75 C115 55 120 44 130 38 Z"/><path fill="#fff" d="M114 69 C142 60 171 56 199 58 L200 73 C172 71 143 75 116 84 Z"/><path fill="#fff" stroke="#111" stroke-width="2.5" stroke-linejoin="round" d="M196 61 L226 47 L216 70 Z M197 70 L228 84 L210 82 Z"/></svg>`,
+  russie: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="300" height="67" fill="#fff"/><rect y="67" width="300" height="66" fill="#1c3f94"/><rect y="133" width="300" height="67" fill="#d52b1e"/></svg>`,
+  france: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="100" height="200" fill="#1f3c8c"/><rect x="100" width="100" height="200" fill="#fff"/><rect x="200" width="100" height="200" fill="#e1251b"/></svg>`,
+  italie: `<svg viewBox="0 0 300 200" class="flag wave"><rect width="100" height="200" fill="#0b8a43"/><rect x="100" width="100" height="200" fill="#fff"/><rect x="200" width="100" height="200" fill="#cf2b37"/></svg>`
+};
+function flagFor(txt){ const n = norm(txt||""); if (/cors/.test(n)) return FLAGS.corse; if (/russ|moscou|moscow/.test(n)) return FLAGS.russie; if (/franc|paris/.test(n)) return FLAGS.france; if (/ital/.test(n)) return FLAGS.italie; return ""; }
+function trameScenes(){
+  const f = fiche(), cm = toCm(f.height), kg = toKg(f.weight), rec = String(f.rec||"0-0-0").split(/\D+/).filter(Boolean).slice(0,3);
+  while (rec.length < 3) rec.push("0");
+  const blue = norm(f.corner).startsWith("b");
+  return [
+    {cue:"Ladies and gentlemen", top:"Fight Camp", main:"Mesdames et messieurs", fx:"riser"},
+    {cue:"The main event", top:"Ce soir", main:"Main event", sub:"Le combat de la soirée", cls:"gold", fx:"boom"},
+    {cue:"And now", main:"Et maintenant…", cls:"dim"},
+    {cue:"Blue corner", top:"Dans le coin", main: blue ? "Bleu" : "Rouge", cls: blue ? "blue" : "red", fx:"flash"},
+    {cue:"Taille", top:"Combattant MMA · taille", main: f.height, sub: cm ? `${String(cm/100).replace(".", ",")} m` : "", art:`<div class="art-ruler"><i></i></div>`, cls: blue ? "blue" : "red"},
+    {cue:"Poids", top:"Pesée", main: f.weight, sub: kg ? `${fmt1(kg)} kg` : "", art:`<div class="art-scale"><b data-cnt="${kg||0}">0</b><span>kg</span></div>`, cls: blue ? "blue" : "red"},
+    {cue:"Représente", top:"Représente", main: f.rep, art: flagFor(f.rep), cls:"flagbg", fx:"flash"},
+    {cue:"Né à", top:"Né à", main: f.born, art: flagFor(f.born), cls:"flagbg", fx:"flash"},
+    {cue:"Âge", top:"À seulement", main:"", art:`<div class="art-age"><b data-cnt="${parseInt(f.age)||0}" data-int="1">0</b><span>ans</span></div>`, cls:"dim"},
+    {cue:"Palmarès", top:"Palmarès professionnel", main:"", art:`<div class="art-rec">${rec.map((d,i)=>`<div><b style="animation-delay:${i*.25}s">${esc(d)}</b><span>${["Victoires","Défaites","Nuls"][i]}</span></div>`).join("")}</div>`, cls:"dim"},
+    {cue:"He is", main:"C'est…", cls:"black", fx:"heart"},
+    {cue:"Nom", top: f.nick ? `« ${f.nick} »` : "", main: f.full || fighterName(), cls:"name", fx:"name"},
+    {cue:"Final", main:"", art:`<div class="art-final"><b>Fight</b><b>Camp</b></div>`, cls:"final", fx:"pyro"}
+  ];
+}
+function heartbeat(){ if (!fx.ctx) return; const c = fx.ctx; [0,.28,1.1,1.38,2.2,2.48].forEach(dt=>{ const n = c.currentTime + dt, o = c.createOscillator(), g = c.createGain();
+  o.frequency.setValueAtTime(70, n); o.frequency.exponentialRampToValueAtTime(40, n+.18); g.gain.setValueAtTime(.0001, n); g.gain.exponentialRampToValueAtTime(.8, n+.02); g.gain.exponentialRampToValueAtTime(.001, n+.25);
+  o.connect(g); g.connect(fx.out); o.start(n); o.stop(n+.3); }); }
+function pyro(){ const sc = document.getElementById("fn"); if (!sc) return;
+  const box = document.createElement("div"); box.className = "pyro"; box.innerHTML = [...Array(10)].map((_,i)=>`<i style="left:${5+i*10}%;animation-delay:${(i%5)*.08}s"></i>`).join(""); sc.appendChild(box);
+  if (fx.ctx){ const c = fx.ctx, n = c.currentTime, s = fxNoise(), hp = c.createBiquadFilter(), g = c.createGain(); hp.type = "highpass"; hp.frequency.value = 3000;
+    g.gain.setValueAtTime(.5, n); g.gain.exponentialRampToValueAtTime(.001, n+2.5); s.connect(hp); hp.connect(g); g.connect(fx.out); s.start(n); s.stop(n+2.6); } }
+function countUp(root){ root.querySelectorAll("[data-cnt]").forEach(b=>{ const to = +b.dataset.cnt, int = !!b.dataset.int, t0 = performance.now();
+  const st = now => { const k = Math.min(1, (now-t0)/1100), v = to*(1-Math.pow(1-k,3)); b.textContent = int ? Math.round(v) : fmt1(v); if (k < 1) requestAnimationFrame(st); }; requestAnimationFrame(st); }); }
+const SCENE_CLS = ["blue","red","gold","dim","flagbg","black","name","final"];
+function playScene(el, s){
+  SCENE_CLS.forEach(k=>el.classList.remove("sc-"+k)); if (s.cls) el.classList.add("sc-"+s.cls);
+  fnText(s.main || "", s.sub || "", s.top || "");
+  const sc = document.getElementById("fnScene"); if (sc){ sc.innerHTML = s.art ? `<div class="art in">${s.art}</div>` : ""; countUp(sc); }
+  if (s.fx==="boom"){ boom(); fnFlash("gold"); roar(.35,.08); }
+  else if (s.fx==="flash") fnFlash();
+  else if (s.fx==="riser") riser(1.5);
+  else if (s.fx==="heart"){ crowdLevel(.02, .5); heartbeat(); }
+  else if (s.fx==="name"){ boom(); fnFlash("gold"); roar(1, .3); confetti(); }
+  else if (s.fx==="pyro"){ fnFlash(); pyro(); roar(1, .3); confetti(); }
+}
+function clearScenes(el){ el.querySelectorAll(".pyro").forEach(x=>x.remove()); SCENE_CLS.forEach(k=>el.classList.remove("sc-"+k)); const sc = document.getElementById("fnScene"); if (sc) sc.innerHTML = ""; }
+
+const useTrame = () => career().trame !== false;
 /* ---------- Annonce : fichier audio ou vidéo YouTube, même lecteur ---------- */
 const annSrc = () => { const c = career(); return c.audio && c.audio.path ? "audio" : ytId(c.yt) ? "yt" : null; };
 const annStart = () => { const c = career(); return c.ytStart ?? (annSrc()==="yt" ? ytT(c.yt) : 0); };
@@ -3285,6 +3387,7 @@ function openYtCal(){
     <div class="row between"><span class="num" id="calNow">0,0 s</span><span class="small muted" id="calInfo"></span></div>
     <div class="grid3"><button class="btn" data-act="calStart">Début ici</button><button class="btn red" data-act="calCue">Impact</button><button class="btn" data-act="calEnd">Fin ici</button></div>
     <div class="chips" id="calCues"></div>
+    ${useTrame() ? `<p class="small" style="margin:0">Ta trame : touche « Début ici » sur « Ladies and gentlemen », puis « Impact » au début de chaque phrase suivante. Le prochain impact attendu est indiqué au-dessus.</p>` : ""}
     <p class="small muted" style="margin:0">Lance l'annonce et touche « Début ici » quand l'annonce commence. Pendant qu'il parle, touche « Impact » à chaque moment fort : « Mesdames et messieurs », l'annonce du main event, le coin bleu, le coin rouge. Touche « Fin ici » quand il a fini. À chaque impact, l'app fera un flash et changera le texte à l'écran.</p>
     <div class="row"><button class="btn ghost" data-act="calReplay">Revoir avec les flashs</button><button class="btn ghost" data-act="calClear">Effacer les impacts</button></div>
     <button class="btn red" data-act="calSave">Enregistrer le calage</button>`;
@@ -3299,7 +3402,9 @@ function openYtCal(){
 }
 function paintCal(){
   const i = document.getElementById("calInfo"); if (i) i.textContent = `Début ${fmtS(cal.start)} · Fin ${cal.end ? fmtS(cal.end) : "–"}`;
-  const q = document.getElementById("calCues"); if (q) q.innerHTML = cal.cues.length ? cal.cues.map((t,k)=>`<button class="chip on" data-act="calDel" data-i="${k}">${k+1}. ${fmtS(t)} ×</button>`).join("") : `<span class="small muted">Aucun impact pour l'instant.</span>`;
+  const lab = useTrame() ? trameScenes().map(x=>x.cue) : null;
+  const q = document.getElementById("calCues"); if (q) q.innerHTML = (cal.cues.length ? cal.cues.map((t,k)=>`<button class="chip on" data-act="calDel" data-i="${k}">${lab && lab[k+1] ? esc(lab[k+1]) + " · " : (k+1) + ". "}${fmtS(t)} ×</button>`).join("") : `<span class="small muted">Aucun impact pour l'instant.</span>`)
+    + (lab ? `<div class="small" style="width:100%;margin-top:4px">${cal.cues.length+1 < lab.length ? `Prochain impact : <b style="color:var(--gold)">${esc(lab[cal.cues.length+1])}</b>` : `<b style="color:var(--gold)">Tous les impacts sont calés.</b> Touche « Fin ici » à la fin du son.`}</div>` : "");
 }
 const calTime = () => { try{ return cal.p ? cal.p.getCurrentTime() || 0 : 0; }catch(e){ return 0; } };
 function closeYtCal(){ clearInterval(cal.tm); try{ cal.p && cal.p.destroy(); }catch(e){} cal.p = null; document.getElementById("ytcal")?.remove(); }
@@ -3309,8 +3414,10 @@ async function ytAnnounce(alive, el, opp, name, nick){
   let cues = (c.ytCues||[]).filter(x=>x>st && x<en).sort((a,b)=>a-b);
   if (!cues.length) cues = [1,2,3].map(k=>st + (en-st)*k/4);
   const texts = [["Mesdames et messieurs","","Main event"], [opp.title?"Combat pour le titre":"Main event", `${opp.rounds} rounds`, "Fight Camp"], [`${opp.first} ${opp.last}`, `« ${opp.nick} » · ${opp.w}-${opp.l}-0`, "Coin bleu"], [name, nick?`« ${nick} »`:"Coin rouge", "Coin rouge"]];
+  const scenes = useTrame() ? trameScenes() : null;
+  if (scenes && !(c.ytCues||[]).length) cues = scenes.slice(1).map((_,k)=>st + (en-st)*(k+1)/scenes.length);
   const jb = document.getElementById("fnJumbo"); jb && jb.classList.add("on");
-  crowdLevel(.04, 1); fnText(...texts[0]);
+  crowdLevel(.04, 1); if (scenes) playScene(el, scenes[0]); else fnText(...texts[0]);
   try{ p.unMute(); p.seekTo(st, true); p.playVideo(); }catch(e){}
   let i = 0, started = false, hinted = false; const t0 = Date.now();
   while (alive()){
@@ -3320,15 +3427,18 @@ async function ytAnnounce(alive, el, opp, name, nick){
     if (!started && !hinted && Date.now() - t0 > 3500){ hinted = true; document.getElementById("fnExtra").innerHTML = annSrc()==="yt" ? `<p class="fnmsg">Touche la vidéo pour lancer l'annonce</p>` : `<button class="btn red" data-act="annPlay">Lancer l'annonce</button>`; }
     if (started && hinted){ hinted = false; document.getElementById("fnExtra").innerHTML = ""; }
     while (started && i < cues.length && t >= cues[i]){
-      const k = i + 1; fnFlash(k >= 3 ? "gold" : "flash");
+      const k = i + 1;
+      if (scenes){ if (k < scenes.length) playScene(el, scenes[k]); i++; continue; }
+      fnFlash(k >= 3 ? "gold" : "flash");
       if (k < texts.length){ fnText(...texts[k]); el.classList.toggle("blue", k===2); el.classList.toggle("red", k===3); }
       i++;
     }
     if (started && (t >= en || state === 0)) break;
     if (Date.now() - t0 > (en - st + 25) * 1000) break;
   }
+  if (scenes && alive()) await wait(1800);
   try{ p.pauseVideo(); }catch(e){}
-  jb && jb.classList.remove("on"); el.classList.remove("blue","red"); crowdLevel(.3, 1.5);
+  jb && jb.classList.remove("on"); el.classList.remove("blue","red"); if (scenes) clearScenes(el); crowdLevel(.3, 1.5);
 }
 
 
@@ -3727,6 +3837,7 @@ document.addEventListener("change", async e=>{
   if (el.id==="annIn"){ const f = el.files && el.files[0]; el.value = ""; if (f) uploadAnnounce(f); return; }
   if (el.dataset.cr==="yt"){ const c = career(); c.yt = el.value.trim(); if (!(c.audio && c.audio.path)){ c.ytStart = ytT(c.yt); c.ytEnd = null; c.ytCues = []; } saveProfile(); if (c.yt && !ytId(c.yt)) toast("Lien YouTube non reconnu"); render(); return; }
   if (el.dataset.cr){ career()[el.dataset.cr] = el.value.trim(); saveProfile(); if (el.dataset.cr==="spotify"){ if (el.value && !spotifyUri(el.value) && !ytId(el.value)) toast("Lien non reconnu"); render(); } return; }
+  if (el.dataset.fi){ fiche()[el.dataset.fi] = el.value.trim(); saveProfile(); return; }
   if (el.dataset.crCheck){ career()[el.dataset.crCheck] = el.checked; saveProfile(); return; }
   if (el.dataset.habit){ day().habits[el.dataset.habit] = el.checked; saveDay();
     const done = profile.habits.filter(h=>day().habits[h.id]).length;
