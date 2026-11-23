@@ -1181,7 +1181,9 @@ async function runPlanner(nDays){
     const dk = dkey(addDays(parseKey(start), i));
     ai.msg = nDays>1 ? `Le Chef prépare le jour ${i+1} sur ${nDays}…` : "Le Chef prépare ta journée…"; paintAi(); 
     try{
-      const repas = await planDay(dk, names, ai.ctl.signal);
+      let repas;
+      try{ repas = await planDay(dk, names, ai.ctl.signal); if (!repas.length) throw {code:"empty_completion"}; }
+      catch(e1){ if (!["invalid_json","empty_completion"].includes(e1 && e1.code)) throw e1; ai.msg = `Le Chef reprend le jour ${i+1}…`; paintAi(); repas = await planDay(dk, names, ai.ctl.signal); }
       if (!repas.length) throw {code:"empty_completion"};
       plan.days.push({date: dk, repas}); repas.forEach(r=>names.push(r.nom));
       saveProfile(); render();
