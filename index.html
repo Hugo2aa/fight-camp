@@ -416,6 +416,15 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .fnstart b{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(40px,12vw,70px);line-height:.95;padding:0 20px}
 .fnstart span:last-child{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:13px}
 @media (prefers-reduced-motion: reduce){.fnbeams i{animation:none}.fn.flash::after,.fn.gold::after{animation:none;opacity:0}}
+
+.jumbo{aspect-ratio:16/9;width:100%;border:2px solid var(--gold);border-radius:6px;overflow:hidden;background:#000;box-shadow:0 0 40px rgba(217,164,58,.25)}
+.jumbo iframe{width:100%;height:100%;display:block}
+.fnjumbo{position:absolute;left:16px;right:16px;width:auto;top:calc(env(safe-area-inset-top) + 56px);z-index:4;opacity:0;pointer-events:none;transform:scale(.92);transition:opacity .6s,transform .6s}
+.fnjumbo.on{opacity:1;pointer-events:auto;transform:none}
+.fn:has(.fnjumbo.on) .fnstage{margin-top:38vw}
+#ytcal{z-index:65;overflow-y:auto}
+#ytcal.calflash{animation:calf .35s ease-out}
+@keyframes calf{from{box-shadow:inset 0 0 0 200px rgba(217,164,58,.35)}to{box-shadow:inset 0 0 0 200px rgba(217,164,58,0)}}
 </style>
 </head>
 <body>
@@ -2911,6 +2920,9 @@ function viewCareer(){
     <label class="f" for="cr_nick">Surnom<input id="cr_nick" data-cr="nick" value="${esc(c.nick)}" placeholder="Ex : Le Cutter"></label>
     <label class="f" for="cr_sp">Musique d'entrée (lien Spotify)<input id="cr_sp" data-cr="spotify" value="${esc(c.spotify)}" placeholder="https://open.spotify.com/track/…" inputmode="url"></label>
     <p class="small muted" style="margin:0">Dans Spotify : ⋯ sur ton son › Partager › Copier le lien, puis colle-le ici. Sans compte Spotify connecté dans le navigateur, c'est un extrait de 30 s qui joue (assez pour l'entrée). Sans lien, l'app joue un beat d'arène.</p>
+    <label class="f" for="cr_yt">Annonce vidéo (lien YouTube)<input id="cr_yt" data-cr="yt" value="${esc(c.yt||"")}" placeholder="https://youtu.be/…" inputmode="url"></label>
+    ${ytId(c.yt) ? `<div class="row between"><span class="small muted">${c.ytCues&&c.ytCues.length ? `${c.ytCues.length} impact${c.ytCues.length>1?"s":""} calé${c.ytCues.length>1?"s":""} · de ${fmtS(c.ytStart||0)} à ${c.ytEnd?fmtS(c.ytEnd):"la fin"}` : "Pas encore calée : les textes changeront à intervalles réguliers."}</span><button class="btn sm" data-act="ytCal">Caler le timing</button></div>` : ""}
+    <p class="small muted" style="margin:0">La vidéo passe sur un écran géant pendant la Fight Night, juste après ton entrée. Les flashs et les textes tombent aux moments que tu as calés. Ensuite, la voix de l'app annonce ton nom.</p>
     <label class="row small" for="cr_voice" style="gap:8px"><input type="checkbox" id="cr_voice" data-cr-check="voice" ${c.voice!==false?"checked":""} style="width:auto"> Voix de l'annonceur</label>
     <div class="row"><button class="btn red" data-act="walkout">Lancer mon entrée</button><button class="btn" data-act="fightTest">Simuler le combat de la semaine</button></div>
   </section>
@@ -3009,20 +3021,22 @@ function openFightNight(mode, wk){
   if (mode==="test"){ const last = c.fights[c.fights.length-1], ri = rankIdx(c.pts), opp = oppFor(wkKey(), ri, last && last.res), me = weekXP(wkKey());
     const diff = (me - opp.target)/Math.max(1,opp.target), m = fightMethod(diff, hash("m:"+wkKey()), opp.rounds);
     f = {wk:wkKey(), opp, me, res: m.kind==="D" ? "D" : diff>0 ? "W" : "L", method:m, rankBefore:ri, rankAfter:ri, test:true}; }
-  Object.assign(fn, {on:true, mode, f, run: (fn.run||0)+1, sp:null});
+  Object.assign(fn, {on:true, mode, f, run: (fn.run||0)+1, sp:null, yt:null});
   const el = document.createElement("div"); el.id = "fn"; el.className = "fn";
   el.innerHTML = `<canvas id="fnCv" aria-hidden="true"></canvas><div class="fnbeams" aria-hidden="true"><i></i><i></i><i></i></div>
     <button class="x fnx" data-act="fnClose" aria-label="Fermer">×</button>
     <div class="fnstage"><div id="fnTop" class="kicker"></div><div id="fnMain" class="fnmain"></div><div id="fnSub" class="fnsub"></div><div id="fnExtra"></div></div>
     <div class="fnsp" id="fnSpWrap"><div id="fnSp"></div></div>
+    ${ytId(c.yt) ? `<div class="jumbo fnjumbo" id="fnJumbo"><div id="fnYt"></div></div>` : ""}
     <button class="fnstart" id="fnStart" data-act="fnGo"><span class="kicker" style="color:var(--gold)">${mode==="walkout"?"Ton entrée":"Fight Night"}</span><b>${mode==="walkout"?"Entrer dans l'arène":"Le combat va commencer"}</b><span>Monte le son et touche l'écran</span></button>`;
   document.body.appendChild(el); document.body.style.overflow = "hidden";
   const uri = spotifyUri(c.spotify);
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
+  if (ytId(c.yt)) makeYT("fnYt", ytId(c.yt), c.ytStart ?? ytT(c.yt)).then(p=>{ if (fn.on) fn.yt = p; });
   if (window.speechSynthesis) speechSynthesis.getVoices();
 }
 function closeFightNight(){
-  fn.on = false; fn.run++; fxClose(); try{ fn.sp && fn.sp.pause(); }catch(e){}
+  fn.on = false; fn.run++; fxClose(); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} fn.yt = null;
   const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
   const c = career(); if (fn.mode==="result" && c.pending){ c.pending = null; saveProfile(); }
   render();
@@ -3056,6 +3070,7 @@ async function runFightNight(){
 
   // 1. L'entrée : musique + foule
   crowdStart();
+  if (fn.yt){ try{ fn.yt.mute(); fn.yt.playVideo(); setTimeout(()=>{ try{ fn.yt.pauseVideo(); fn.yt.seekTo(career().ytStart ?? ytT(career().yt), true); }catch(e){} }, 400); }catch(e){} }
   const hasSp = !!fn.sp;
   if (hasSp){ try{ fn.sp.play(); }catch(e){} } else arenaBeat(60);
   fnText(name, nick ? `« ${nick} »` : "Coin rouge", "Entrée dans l'arène"); fnFlash();
@@ -3066,7 +3081,11 @@ async function runFightNight(){
   document.getElementById("fnSpWrap")?.classList.add("gone");
   if (!alive()) return;
 
-  // 2. L'annonceur
+  // 2. L'annonceur : vidéo calée, ou voix de l'app
+  if (fn.yt){
+    await ytAnnounce(alive, el, opp, name, nick); if (!alive()) return;
+    riser(2); await wait(1500); if (!alive()) return;
+  } else {
   crowdLevel(.18, 1.5); riser(2.6); fnText("Mesdames et messieurs", "", "Main event"); await wait(400);
   await say("Mesdames et messieurs...", {rate:.78, pitch:.55}); if (!alive()) return;
   boom(); fnFlash(); roar();
@@ -3077,6 +3096,7 @@ async function runFightNight(){
   await say(`Dans le coin bleu... venu de ${opp.city}... avec un palmarès de ${opp.w} victoires et ${opp.l} défaites... ${opp.nick}... ${opp.first} ${opp.last} !`); if (!alive()) return;
   roar(.55,.25); await wait(900); el.classList.remove("blue"); if (!alive()) return;
   riser(2.2); await wait(1600); if (!alive()) return;
+  }
   fnText(name, `${nick?`« ${nick} » · `:""}${W}-${L}-${D} · ${RANKS[ri][0]}`, "Coin rouge"); el.classList.add("red"); boom(); fnFlash();
   await say(`Et dans le coin rouge... ${profile.weightClass?`combattant de la catégorie des ${profile.weightClass}...`:""} classé ${RANKS[ri][0]}... avec un palmarès de ${W} victoire${W>1?"s":""} et ${L} défaite${L>1?"s":""}...${nick?` ${nick}...`:""}`, {rate:.82}); if (!alive()) return;
   await say(`${name} !`, {rate:.62, pitch:.5}); roar(1, .35); confetti(); if (!alive()) return;
@@ -3117,6 +3137,78 @@ async function runFightNight(){
     : draw ? "Une semaine de plus pour faire la différence." : "Ton prochain adversaire sera un peu moins fort. Relève-toi.";
   document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">${esc(msg)} ${fmt0(f.me)} XP contre ${fmt0(opp.target)}.</p><div class="row" style="justify-content:center"><button class="btn" data-act="fnReplay">Revoir</button><button class="btn red" data-act="fnClose">Continuer</button></div>`;
   if (!win) await say(msg);
+}
+
+
+/* ---------- Annonce vidéo YouTube calée sur le motion design ---------- */
+function ytId(s){ const m = String(s||"").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : null; }
+function ytT(s){ const m = String(s||"").match(/[?&]t=(\d+)/); return m ? +m[1] : 0; }
+let ytApiP = null;
+function loadYT(){
+  if (window.YT && YT.Player) return Promise.resolve(YT);
+  if (ytApiP) return ytApiP;
+  ytApiP = new Promise(res=>{ window.onYouTubeIframeAPIReady = () => res(window.YT); const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; sc.onerror = () => { ytApiP = null; res(null); }; document.head.appendChild(sc); setTimeout(()=>res(window.YT && YT.Player ? YT : null), 10000); });
+  return ytApiP;
+}
+function makeYT(elId, vid, start){
+  return loadYT().then(Y=>{ if (!Y || !document.getElementById(elId)) return null; return new Promise(res=>{ let done = false; const fin = p => { if (!done){ done = true; res(p); } };
+    const p = new Y.Player(elId, {videoId:vid, width:"100%", height:"100%", playerVars:{start:Math.floor(start||0), playsinline:1, controls:1, rel:0, modestbranding:1}, events:{onReady:()=>fin(p), onError:()=>fin(p)}});
+    setTimeout(()=>fin(p), 8000); }); });
+}
+const fmtS = t => (Math.round(t*10)/10).toLocaleString("fr-FR",{minimumFractionDigits:1}) + " s";
+const cal = {p:null, tm:null, start:0, end:null, cues:[], replay:false, last:0};
+function openYtCal(){
+  const c = career(), vid = ytId(c.yt); if (!vid){ toast("Colle d'abord un lien YouTube"); return; }
+  Object.assign(cal, {start: c.ytStart ?? ytT(c.yt), end: c.ytEnd ?? null, cues: (c.ytCues||[]).slice(), replay:false, last:0});
+  const el = document.createElement("div"); el.id = "ytcal"; el.className = "player";
+  el.innerHTML = `<div class="row between"><span class="kicker">Caler l'annonce</span><button class="x" data-act="calClose" aria-label="Fermer">×</button></div>
+    <div class="jumbo on" style="position:relative;inset:auto"><div id="ytCalP"></div></div>
+    <div class="row between"><span class="num" id="calNow">0,0 s</span><span class="small muted" id="calInfo"></span></div>
+    <div class="grid3"><button class="btn" data-act="calStart">Début ici</button><button class="btn red" data-act="calCue">Impact</button><button class="btn" data-act="calEnd">Fin ici</button></div>
+    <div class="chips" id="calCues"></div>
+    <p class="small muted" style="margin:0">Lance la vidéo et touche « Début ici » quand l'annonce commence. Pendant qu'il parle, touche « Impact » à chaque moment fort : « Mesdames et messieurs », l'annonce du main event, le coin bleu, le coin rouge. Touche « Fin ici » quand il a fini. À chaque impact, l'app fera un flash et changera le texte à l'écran.</p>
+    <div class="row"><button class="btn ghost" data-act="calReplay">Revoir avec les flashs</button><button class="btn ghost" data-act="calClear">Effacer les impacts</button></div>
+    <button class="btn red" data-act="calSave">Enregistrer le calage</button>`;
+  document.body.appendChild(el); paintCal();
+  makeYT("ytCalP", vid, cal.start).then(p=>{ cal.p = p; });
+  cal.tm = setInterval(()=>{ if (!cal.p || !cal.p.getCurrentTime) return; let t = 0; try{ t = cal.p.getCurrentTime() || 0; }catch(e){}
+    const n = document.getElementById("calNow"); if (n) n.textContent = fmtS(t);
+    if (cal.replay && cal.cues.some(q=>q > cal.last && q <= t)){ const y = document.getElementById("ytcal"); y.classList.remove("calflash"); void y.offsetWidth; y.classList.add("calflash"); }
+    if (cal.replay && cal.end && t >= cal.end){ cal.replay = false; try{ cal.p.pauseVideo(); }catch(e){} }
+    cal.last = t; }, 80);
+}
+function paintCal(){
+  const i = document.getElementById("calInfo"); if (i) i.textContent = `Début ${fmtS(cal.start)} · Fin ${cal.end ? fmtS(cal.end) : "–"}`;
+  const q = document.getElementById("calCues"); if (q) q.innerHTML = cal.cues.length ? cal.cues.map((t,k)=>`<button class="chip on" data-act="calDel" data-i="${k}">${k+1}. ${fmtS(t)} ×</button>`).join("") : `<span class="small muted">Aucun impact pour l'instant.</span>`;
+}
+const calTime = () => { try{ return cal.p ? cal.p.getCurrentTime() || 0 : 0; }catch(e){ return 0; } };
+function closeYtCal(){ clearInterval(cal.tm); try{ cal.p && cal.p.destroy(); }catch(e){} cal.p = null; document.getElementById("ytcal")?.remove(); }
+
+async function ytAnnounce(alive, el, opp, name, nick){
+  const c = career(), p = fn.yt, st = c.ytStart ?? ytT(c.yt), en = c.ytEnd || st + 45;
+  let cues = (c.ytCues||[]).filter(x=>x>st && x<en).sort((a,b)=>a-b);
+  if (!cues.length) cues = [1,2,3].map(k=>st + (en-st)*k/4);
+  const texts = [["Mesdames et messieurs","","Main event"], [opp.title?"Combat pour le titre":"Main event", `${opp.rounds} rounds`, "Fight Camp"], [`${opp.first} ${opp.last}`, `« ${opp.nick} » · ${opp.w}-${opp.l}-0`, "Coin bleu"], [name, nick?`« ${nick} »`:"Coin rouge", "Coin rouge"]];
+  const jb = document.getElementById("fnJumbo"); jb && jb.classList.add("on");
+  crowdLevel(.04, 1); fnText(...texts[0]);
+  try{ p.unMute(); p.seekTo(st, true); p.playVideo(); }catch(e){}
+  let i = 0, started = false, hinted = false; const t0 = Date.now();
+  while (alive()){
+    await wait(70);
+    let t = 0, state = -1; try{ t = p.getCurrentTime() || 0; state = p.getPlayerState(); }catch(e){}
+    if (state === 1) started = true;
+    if (!started && !hinted && Date.now() - t0 > 3500){ hinted = true; document.getElementById("fnExtra").innerHTML = `<p class="fnmsg">Touche la vidéo pour lancer l'annonce</p>`; }
+    if (started && hinted){ hinted = false; document.getElementById("fnExtra").innerHTML = ""; }
+    while (started && i < cues.length && t >= cues[i]){
+      const k = i + 1; fnFlash(k >= 3 ? "gold" : "flash");
+      if (k < texts.length){ fnText(...texts[k]); el.classList.toggle("blue", k===2); el.classList.toggle("red", k===3); }
+      i++;
+    }
+    if (started && (t >= en || state === 0)) break;
+    if (Date.now() - t0 > (en - st + 25) * 1000) break;
+  }
+  try{ p.pauseVideo(); }catch(e){}
+  jb && jb.classList.remove("on"); el.classList.remove("blue","red"); crowdLevel(.3, 1.5);
 }
 
 /* ---------- Rendu ---------- */
@@ -3174,6 +3266,15 @@ document.addEventListener("click", async e=>{
     case "fightTest": openFightNight("test"); break;
     case "fightNight": openFightNight("result", b.dataset.v); break;
     case "fnGo": runFightNight(); break;
+    case "ytCal": openYtCal(); break;
+    case "calClose": closeYtCal(); break;
+    case "calStart": cal.start = calTime(); cal.cues = cal.cues.filter(t=>t>cal.start); paintCal(); toast("Début calé"); break;
+    case "calEnd": { const t = calTime(); if (t <= cal.start){ toast("La fin doit être après le début"); break; } cal.end = t; cal.cues = cal.cues.filter(x=>x<t); paintCal(); toast("Fin calée"); break; }
+    case "calCue": { const t = calTime(); if (t <= cal.start){ toast("Cale d'abord le début"); break; } cal.cues = cal.cues.concat(t).sort((a,b)=>a-b); paintCal(); const y = document.getElementById("ytcal"); y.classList.remove("calflash"); void y.offsetWidth; y.classList.add("calflash"); break; }
+    case "calDel": cal.cues.splice(i,1); paintCal(); break;
+    case "calClear": cal.cues = []; paintCal(); break;
+    case "calReplay": if (cal.p){ try{ cal.p.seekTo(cal.start, true); cal.p.playVideo(); }catch(e){} cal.last = cal.start; cal.replay = true; } break;
+    case "calSave": { const c = career(); c.ytStart = cal.start; c.ytEnd = cal.end; c.ytCues = cal.cues.slice(); saveProfile(); closeYtCal(); toast("Calage enregistré"); render(); break; }
     case "fnSkip": fn.skip = true; break;
     case "fnClose": closeFightNight(); break;
     case "fnReplay": { const m = fn.mode, w = fn.f && fn.f.wk; closeFightNight(); openFightNight(m, w); break; }
@@ -3278,6 +3379,7 @@ document.addEventListener("click", async e=>{
 
 document.addEventListener("change", async e=>{
   const el = e.target;
+  if (el.dataset.cr==="yt"){ const c = career(); c.yt = el.value.trim(); c.ytStart = ytT(c.yt); c.ytEnd = null; c.ytCues = []; saveProfile(); if (c.yt && !ytId(c.yt)) toast("Lien YouTube non reconnu"); render(); return; }
   if (el.dataset.cr){ career()[el.dataset.cr] = el.value.trim(); saveProfile(); if (el.dataset.cr==="spotify" && el.value && !spotifyUri(el.value)) toast("Lien Spotify non reconnu"); return; }
   if (el.dataset.crCheck){ career()[el.dataset.crCheck] = el.checked; saveProfile(); return; }
   if (el.dataset.habit){ day().habits[el.dataset.habit] = el.checked; saveDay();
