@@ -545,6 +545,13 @@ label.btn{display:inline-flex;justify-content:center;align-items:center;cursor:p
 #wpFloat{position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:25;width:112px;padding:0;border:2px solid var(--gold);border-radius:14px;overflow:hidden;background:#000;box-shadow:0 14px 40px rgba(0,0,0,.7);opacity:0;transform:translateY(16px) scale(.92);pointer-events:none;transition:opacity .25s,transform .25s;cursor:pointer}
 #wpFloat.on{opacity:1;transform:none;pointer-events:auto}
 #wpFloat img{display:block;width:100%;aspect-ratio:1170/2532;object-fit:cover}
+
+.fn3d{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:0;transition:opacity 1.2s ease}
+.fn3d.on{opacity:1}
+.fn.walk3d .fnbeams{display:none}
+.fn.walk3d .fnstage{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 120px);gap:6px}
+.fn.walk3d .fnmain{font-size:clamp(34px,11vw,58px);text-shadow:0 2px 20px rgba(0,0,0,.9)}
+.fn.walk3d #fnTop,.fn.walk3d .fnsub{text-shadow:0 1px 10px rgba(0,0,0,.9)}
 </style>
 </head>
 <body>
@@ -3598,6 +3605,8 @@ function openFightNight(mode, wk, trial){
   const uri = (c.music && c.music.path) || ytId(c.spotify) ? null : spotifyUri(c.spotify);
   if (uri) loadSpotify().then(api=>{ if (!api || !fn.on) return; api.createController(document.getElementById("fnSp"), {uri, width:"100%", height:80}, ctl=>{ fn.sp = ctl; }); });
   if (annSrc()) makeAnnPlayer("fnYt").then(p=>{ if (fn.on) fn.yt = p; });
+  // Entrée en 3D (chargée à l'avance pour démarrer pile au toucher)
+  fn.arenaMod = null; if (!matchMedia("(prefers-reduced-motion: reduce)").matches) import("./lib/arena3d.js").then(m=>{ fn.arenaMod = m; }).catch(()=>{});
   if (window.speechSynthesis) speechSynthesis.getVoices();
 }
 async function musFade(to, ms){
@@ -3607,7 +3616,7 @@ async function musFade(to, ms){
   if (to === 0){ try{ p.pauseVideo(); }catch(e){} }
 }
 function closeFightNight(){
-  fn.on = false; fn.run++; fxClose(); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
+  fn.on = false; fn.run++; fxClose(); document.querySelectorAll(".fn3d").forEach(c=>c.remove()); try{ fn.sp && fn.sp.pause(); }catch(e){} try{ fn.yt && fn.yt.destroy(); }catch(e){} try{ fn.mus && fn.mus.destroy(); }catch(e){} fn.yt = null; fn.mus = null;
   try{ fn.wake && fn.wake.release(); }catch(e){} fn.wake = null;
   const el = document.getElementById("fn"); if (el) el.remove(); document.body.style.overflow = "";
   const c = career(); if (fn.mode==="result" && c.pending){ c.pending = null; saveProfile(); }
@@ -3658,7 +3667,17 @@ async function runFightNight(){
   document.getElementById("fnExtra").innerHTML = `<button class="btn sm ghost fnskip" data-act="fnSkip">Passer l'entrée</button>`;
   fn.skip = false;
   const steps = hasMus ? 50 : 28;
+  // Marche en 3D jusqu'à la cage pendant la musique
+  let arena = null, cv3 = null;
+  if (fn.arenaMod){ try{
+    cv3 = document.createElement("canvas"); cv3.className = "fn3d"; el.insertBefore(cv3, el.firstChild); el.classList.add("walk3d");
+    let roared = 0;
+    arena = fn.arenaMod.startArena(cv3, {duration: steps*.5, name, nick, top: opp.title ? "Combat pour le titre" : "Main event",
+      onProgress: t => { crowdLevel(.25 + t*.35, .3); if (t > .55 && roared < 1){ roared = 1; roar(.75, .45); } if (t > .88 && roared < 2){ roared = 2; roar(1, .55); } }});
+    requestAnimationFrame(()=>cv3.classList.add("on"));
+  }catch(e){ arena = null; cv3 && cv3.remove(); el.classList.remove("walk3d"); } }
   for (let i=0;i<steps && !fn.skip;i++){ await wait(500); if (!alive()) return; if (i===6) roar(.6,.4); if (i===16) fnText(RANKS[ri][0].toUpperCase(), `${W} victoire${W>1?"s":""} · ${L} défaite${L>1?"s":""}${profile.weightClass?" · "+profile.weightClass:""}`, "Entrée dans l'arène"); }
+  if (arena){ const a = arena, c = cv3; c.classList.remove("on"); el.classList.remove("walk3d"); setTimeout(()=>{ a.stop(); c.remove(); }, 1300); }
   if (hasMus) await musFade(0, 2000);
   else if (hasSp){ try{ fn.sp.pause(); }catch(e){} } else beatStop();
   document.getElementById("fnSpWrap")?.classList.add("gone");
