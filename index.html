@@ -2454,8 +2454,8 @@ function fighterLayer(pose, cx, top, h, opt={}){
 }
 function tint(src, color){ const c = document.createElement("canvas"); c.width = src.width; c.height = src.height; const x = c.getContext("2d");
   x.drawImage(src, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c; }
-function spaced(g, t, x, y, sp, align="left"){ const s = String(t).split(""); const w = s.reduce((a,ch)=>a + g.measureText(ch).width + sp, -sp);
-  let px = align==="center" ? x - w/2 : align==="right" ? x - w : x; s.forEach(ch=>{ g.fillText(ch, px, y); px += g.measureText(ch).width + sp; }); return w; }
+function spaced(g, t, x, y, sp, align="left"){ const ta = g.textAlign; g.textAlign = "left"; const s = String(t).split(""); const w = s.reduce((a,ch)=>a + g.measureText(ch).width + sp, -sp);
+  let px = align==="center" ? x - w/2 : align==="right" ? x - w : x; s.forEach(ch=>{ g.fillText(ch, px, y); px += g.measureText(ch).width + sp; }); g.textAlign = ta; return w; }
 function posterData(){
   const c = career(), f = fiche(), opp = currentOpp(), [W,L,D] = record(), cw = currentWeight(), goal = profile.goalWeight;
   const dd = profile.goalDate ? Math.max(0, Math.ceil((parseKey(profile.goalDate)-parseKey(dkey()))/864e5)) : null;
@@ -2619,7 +2619,194 @@ function posterWhite(g, W, H, o, seed){
   lines.forEach((l,i)=>g.fillText(l, W/2, H*.91 + i*size*1.25)); g.fillText("— " + d.q[1], W/2, H*.91 + lines.length*size*1.25 + 6); g.textAlign = "left";
 }
 const POSTER_STYLES = {back: posterBack, match: posterMatch, grain: posterGrain, white: posterWhite};
-const BGS = [["art","Octogone"],["ring","Ring"],["smoke","Fumée"],["poster","Affiche"],["belt","Ceinture"],["minimal","Minimal"],["back","Affiche dos"],["match","Match day"],["grain","Grain"],["white","Blanc"]];
+/* ---------- Affiches, série 2 : arène, cage rouge, ceinture, octogone vide, cage en action, triptyque, bande rouge ---------- */
+function loadImg(url){ return new Promise(res=>{ const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => res(null); im.src = url; }); }
+function vignette(g, W, H, a=.75){ const v = g.createRadialGradient(W/2, H*.5, H*.25, W/2, H*.5, H*.75); v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(0,0,0,${a})`); g.fillStyle = v; g.fillRect(0,0,W,H); }
+function darkGrain(g, W, H, r, n=9000, a=.06){ for (let i=0;i<n;i++){ g.fillStyle = `rgba(0,0,0,${r()*a})`; g.fillRect(r()*W, r()*H, 2, 2); } }
+function poly(g, pts){ g.beginPath(); pts.forEach(([x,y],i)=> i ? g.lineTo(x,y) : g.moveTo(x,y)); g.closePath(); }
+function octPts(cx, cy, rx, ry){ return [...Array(8)].map((_,i)=>{ const a = Math.PI/8 + i*Math.PI/4; return [cx + rx*Math.cos(a), cy + ry*Math.sin(a)]; }); }
+function meshFill(g, x0, y0, x1, y1, step=26, color="rgba(0,0,0,.55)", lw=2){
+  g.save(); g.beginPath(); g.rect(x0, y0, x1-x0, y1-y0); g.clip(); g.strokeStyle = color; g.lineWidth = lw;
+  for (let x = x0 - (y1-y0); x < x1 + (y1-y0); x += step){ g.beginPath(); g.moveTo(x, y0); g.lineTo(x + (y1-y0), y1); g.stroke(); g.beginPath(); g.moveTo(x + (y1-y0), y0); g.lineTo(x, y1); g.stroke(); }
+  g.restore(); }
+function footer(g, W, H, d, color="rgba(239,231,220,.75)", y){
+  g.font = `700 26px ${BODY}`; g.fillStyle = color; const yy = y || H*.955;
+  spaced(g, "FIGHT CAMP", 90, yy, 8); spaced(g, `N°${String(d.ed).padStart(3,"0")}`, W-90, yy, 6, "right"); }
+
+// Arène vue d'en haut : foule, faisceau, ring éclairé, un combattant seul
+function posterArena(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  const bg = g.createRadialGradient(W*.5, H*.62, 50, W*.5, H*.55, H*.8); bg.addColorStop(0,"#1c2a2c"); bg.addColorStop(.5,"#0a1214"); bg.addColorStop(1,"#030607"); g.fillStyle = bg; g.fillRect(0,0,W,H);
+  const ring = [[W*.27, H*.555], [W*.76, H*.575], [W*.7, H*.695], [W*.19, H*.665]], rc = [W*.48, H*.62];
+  // foule
+  poly(g, ring.map(([x,y])=>[x + (x-rc[0])*.12, y + (y-rc[1])*.25])); const inRing = (x,y)=>g.isPointInPath(x,y);
+  for (let i=0;i<14000;i++){ const y = H*.3 + Math.pow(r(), .8)*H*.7, x = r()*W, dx = (x-rc[0])/W, dy = (y-rc[1])/H*1.6, dist = Math.hypot(dx, dy);
+    if (inRing(x, y)) continue;
+    const fade = Math.min(1, (y - H*.3)/(H*.18)), lit = Math.max(0, 1 - dist*2.2), v = (14 + lit*95 + r()*25)*fade, rr = 6 + r()*7;
+    g.fillStyle = `rgb(${v*.95},${v*.92},${v*.95})`; g.beginPath(); g.ellipse(x, y, rr, rr*1.15, 0, 0, 7); g.fill();
+    if (r() < .02){ g.fillStyle = "rgba(255,255,255,.85)"; g.fillRect(x, y-4, 5, 7); } }
+  // ring
+  const mat = g.createLinearGradient(0, H*.55, 0, H*.7); mat.addColorStop(0,"#cfdcdc"); mat.addColorStop(1,"#8fa3a5"); g.fillStyle = mat; poly(g, ring); g.fill();
+  g.strokeStyle = "rgba(10,14,15,.85)"; g.lineWidth = 3;
+  [0,1,2].forEach(k=>{ const off = 14 + k*16; g.beginPath(); ring.forEach(([x,y],i)=> i ? g.lineTo(x, y-off) : g.moveTo(x, y-off)); g.closePath(); g.stroke(); });
+  ring.forEach(([x,y])=>{ g.fillStyle = "#e9eef0"; g.fillRect(x-5, y-62, 10, 62); });
+  // combattant seul au centre
+  const fh = H*.075, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", rc[0], rc[1] - fh*.92, fh, {rim:"rgba(255,240,220,.9)"});
+  g.drawImage(tint(f, "#1a1210"), 0, 0); g.save(); g.globalAlpha = .7; g.drawImage(tint(f, "#d9b8a0"), 2, -1); g.restore(); g.drawImage(tint(f, "#140e0c"), 1, 1);
+  // faisceau et brume
+  g.save(); g.filter = "blur(30px)"; const bm = g.createLinearGradient(0, 0, W*.5, H*.62); bm.addColorStop(0,"rgba(170,210,215,.0)"); bm.addColorStop(.35,"rgba(170,210,215,.22)"); bm.addColorStop(1,"rgba(200,230,235,.28)");
+  g.fillStyle = bm; poly(g, [[-W*.2, H*.12], [W*.05, H*.05], [W*.72, H*.6], [W*.25, H*.66]]); g.fill(); g.restore(); g.filter = "none";
+  const hz = g.createRadialGradient(rc[0], rc[1], 20, rc[0], rc[1], W*.6); hz.addColorStop(0,"rgba(200,225,228,.18)"); hz.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = hz; g.fillRect(0,0,W,H);
+  vignette(g, W, H, .7);
+  // textes
+  g.textAlign = "center"; g.fillStyle = "#e8eeee"; g.font = `700 26px ${BODY}`; spaced(g, "MAIN EVENT", W/2, H*.09, 14, "center");
+  g.font = `120px ${DISP}`; g.fillText(d.first.toUpperCase(), W/2, H*.17);
+  g.font = `600 28px ${BODY}`; g.fillStyle = "rgba(232,238,238,.65)"; spaced(g, `${d.W}-${d.L}-${d.D}  ·  ${d.rank.toUpperCase()}${d.nick ? "  ·  « " + d.nick.toUpperCase() + " »" : ""}`, W/2, H*.2, 6, "center");
+  const {size, lines} = fitLines(g, "« " + d.q[0] + " »", W*.78, 3, 40, 28, BODY); g.font = `italic 500 ${size}px ${BODY}`; g.fillStyle = "rgba(232,238,238,.8)";
+  lines.forEach((l,i)=>g.fillText(l, W/2, H*.84 + i*size*1.3)); g.font = `700 24px ${BODY}`; g.fillStyle = "rgba(232,238,238,.5)"; g.fillText(d.q[1].toUpperCase(), W/2, H*.84 + lines.length*size*1.3 + 10);
+  g.textAlign = "left"; footer(g, W, H, d, "rgba(232,238,238,.5)");
+  grain(g, W, H, r, 9000, .05);
+}
+// Cage rouge : brume rouge, grillage, silhouette noire de dos
+function posterRedCage(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  const bg = g.createRadialGradient(W*.5, H*.28, 50, W*.5, H*.35, H*.75); bg.addColorStop(0,"#f43a30"); bg.addColorStop(.55,"#c81e1e"); bg.addColorStop(1,"#4a0808"); g.fillStyle = bg; g.fillRect(0,0,W,H);
+  for (let i=0;i<40;i++){ const x = r()*W, y = r()*H*.7, rr = 150 + r()*400, b = g.createRadialGradient(x,y,0,x,y,rr); b.addColorStop(0, r()<.5 ? "rgba(255,120,100,.10)" : "rgba(60,0,0,.12)"); b.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = b; g.fillRect(x-rr,y-rr,rr*2,rr*2); }
+  const top = H*.6, bot = H*.8;
+  g.fillStyle = "rgba(40,4,4,.55)"; g.fillRect(0, top, W, bot-top);
+  meshFill(g, 0, top+26, W, bot, 22, "rgba(20,0,0,.7)", 2.2);
+  g.fillStyle = "#1a0303"; g.fillRect(0, top, W, 26); [0, .2, .8, 1].forEach(k=>g.fillRect(W*k - 16, top, 32, bot-top));
+  const fl = g.createLinearGradient(0, bot, 0, H); fl.addColorStop(0,"#3a0505"); fl.addColorStop(.3,"#110202"); fl.addColorStop(1,"#070101"); g.fillStyle = fl; g.fillRect(0, bot, W, H-bot);
+  for (let i=0;i<60;i++){ g.fillStyle = `rgba(240,50,40,${.08 + r()*.25})`; g.beginPath(); g.ellipse(r()*W, bot + 10 + r()*60, 30 + r()*140, 4 + r()*8, 0, 0, 7); g.fill(); }
+  const fh = H*.38, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.5, bot + 8 - fh, fh);
+  g.drawImage(tint(f, "#0a0202"), 0, 0);
+  darkGrain(g, W, H, r, 22000, .12);
+  // textes
+  g.textAlign = "center"; g.fillStyle = "#170202"; g.font = `700 28px ${BODY}`; spaced(g, "PERSONNE NE VIENDRA LE FAIRE À TA PLACE", W/2, H*.1, 6, "center");
+  g.font = `150px ${DISP}`; g.fillText(d.dd !== null ? `J-${d.dd}` : "DISCIPLINE", W/2, H*.2);
+  g.font = `700 30px ${BODY}`; g.fillStyle = "rgba(255,220,210,.85)"; if (d.goal) spaced(g, `OBJECTIF ${fmt1(d.goal)} KG${d.cw ? "  ·  ENCORE " + fmt1(Math.max(0, d.cw - d.goal)) + " KG" : ""}`, W/2, H*.9, 6, "center");
+  g.textAlign = "left"; footer(g, W, H, d, "rgba(255,220,210,.45)");
+}
+// Ceinture : silhouette dans le noir, ceinture dorée qui brille
+function posterBeltGlow(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  g.fillStyle = "#050404"; g.fillRect(0,0,W,H);
+  const fh = H*.78, cx = W*.5, top = H*.24, f = fighterLayer("champion", cx, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  g.drawImage(tint(f, "#100c0a"), 0, 0);
+  g.save(); g.globalAlpha = .75; g.drawImage(tint(f, "#d9a43a"), 6, -2); g.restore(); g.drawImage(tint(f, "#0d0a08"), -2, 2);
+  const by = top + .01*fh, bw = fh*.17;
+  g.save(); g.shadowColor = "#ffcc55"; g.shadowBlur = 120;
+  const gg = g.createLinearGradient(cx - bw, by - bw*.5, cx + bw, by + bw*.5); gg.addColorStop(0,"#fff1b0"); gg.addColorStop(.4,"#e0a63a"); gg.addColorStop(.7,"#8a5a14"); gg.addColorStop(1,"#f6d27a");
+  g.fillStyle = gg; poly(g, octPts(cx, by, bw*.62, bw*.48)); g.fill(); g.restore();
+  g.strokeStyle = "#5a3a0a"; g.lineWidth = 6; poly(g, octPts(cx, by, bw*.62, bw*.48)); g.stroke();
+  g.fillStyle = "#3a0b0d"; poly(g, octPts(cx, by, bw*.42, bw*.32)); g.fill();
+  g.fillStyle = "#f6d27a"; g.font = `${Math.round(bw*.32)}px ${DISP}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("FC", cx, by + 4); g.textBaseline = "alphabetic";
+  const hl = g.createRadialGradient(cx, by, 10, cx, by, W*.5); hl.addColorStop(0,"rgba(255,190,80,.25)"); hl.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = hl; g.fillRect(0,0,W,H);
+  for (let i=0;i<220;i++){ g.fillStyle = `rgba(120,140,140,${r()*.25})`; g.fillRect(r()*W, r()*H*.6, 1 + r()*2, 1 + r()*2); }
+  // textes
+  const champ = d.rank === "Champion", nxt = RANKS.find(([,p])=>p > d.c.pts);
+  g.fillStyle = "#f2e6d0"; g.font = `130px ${DISP}`; g.fillText(champ ? "CHAMPION" : "LA CEINTURE", W/2, H*.12);
+  g.font = `700 28px ${BODY}`; g.fillStyle = "#d9a43a"; spaced(g, champ ? `${d.full.toUpperCase()}  ·  ${d.W}-${d.L}-${d.D}` : `RANG ${d.rank.toUpperCase()}  ·  ${nxt ? (nxt[1] - d.c.pts) + " PTS AVANT " + nxt[0].toUpperCase() : ""}`, W/2, H*.155, 6, "center");
+  g.textAlign = "left"; footer(g, W, H, d, "rgba(242,230,208,.45)");
+}
+// Octogone vide : rampe de projecteurs, cage en noir et blanc, sièges
+function posterEmptyCage(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  g.fillStyle = "#030303"; g.fillRect(0,0,W,H);
+  g.strokeStyle = "#151515"; g.lineWidth = 10; g.beginPath(); g.moveTo(W*.1, H*.2); g.lineTo(W*.9, H*.2); g.stroke(); g.lineWidth = 4; g.beginPath(); g.moveTo(W*.5, 0); g.lineTo(W*.5, H*.2); g.stroke();
+  const lights = [...Array(8)].map((_,i)=>[W*(.2 + (i%4)*.2), H*(.225 + Math.floor(i/4)*.018)]);
+  g.save(); g.filter = "blur(18px)"; lights.forEach(([x,y])=>{ const bm = g.createLinearGradient(0, y, 0, H*.72); bm.addColorStop(0,"rgba(255,255,255,.16)"); bm.addColorStop(1,"rgba(255,255,255,0)"); g.fillStyle = bm; poly(g, [[x-14, y], [x+14, y], [W*.5 + (x-W*.5)*.35 + 160, H*.72], [W*.5 + (x-W*.5)*.35 - 160, H*.72]]); g.fill(); }); g.restore(); g.filter = "none";
+  lights.forEach(([x,y])=>{ const gl = g.createRadialGradient(x,y,0,x,y,60); gl.addColorStop(0,"rgba(255,255,255,1)"); gl.addColorStop(.25,"rgba(255,255,255,.6)"); gl.addColorStop(1,"rgba(255,255,255,0)"); g.fillStyle = gl; g.fillRect(x-60,y-60,120,120); });
+  // cage
+  const cx = W/2, cy = H*.795, rx = W*.44, ry = H*.05, ph = H*.07, base = octPts(cx, cy, rx, ry), up = base.map(([x,y])=>[x, y - ph]);
+  const mt = g.createRadialGradient(cx, cy, 20, cx, cy, rx); mt.addColorStop(0,"#e8e8e8"); mt.addColorStop(1,"#8a8a8a"); g.fillStyle = mt; poly(g, base); g.fill();
+  g.save(); g.translate(cx, cy); g.scale(1, .3); g.font = `160px ${DISP}`; g.fillStyle = "rgba(40,40,40,.35)"; g.textAlign = "center"; g.fillText("FIGHT CAMP", 0, 50); g.restore(); g.textAlign = "left";
+  g.save(); poly(g, [...up.slice(0,1), ...up.slice(1)]); g.globalAlpha = .9; g.restore();
+  [[3,4,5,6,7,0],[0,1,2,3]].forEach((idx, back)=>{ idx.slice(0,-1).forEach((k,j)=>{ const a = base[k], b = base[idx[j+1]], A = up[k], B = up[idx[j+1]];
+    g.save(); poly(g, [A, B, b, a]); g.clip(); meshFill(g, Math.min(a[0],b[0]) - 5, Math.min(A[1],B[1]), Math.max(a[0],b[0]) + 5, Math.max(a[1],b[1]), 14, back ? "rgba(20,20,20,.55)" : "rgba(160,160,160,.25)", 1.5); g.restore();
+    g.strokeStyle = back ? "#111" : "#2a2a2a"; g.lineWidth = back ? 14 : 8; g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke(); }); });
+  base.forEach(([x,y],k)=>{ g.fillStyle = y > cy ? "#0e0e0e" : "#2a2a2a"; g.fillRect(x - (y > cy ? 12 : 7), y - ph, y > cy ? 24 : 14, ph); });
+  for (let row=0; row<4; row++) for (let i=0;i<10;i++){ const y = H*.87 + row*H*.03, x = W*(i/9.5) + (row%2)*40 - 20; g.fillStyle = `rgb(${18-row*3},${18-row*3},${18-row*3})`; g.beginPath(); g.roundRect(x, y, W*.085, H*.022, 10); g.fill(); }
+  vignette(g, W, H, .6);
+  g.textAlign = "center"; g.fillStyle = "#f0f0f0"; g.font = `170px ${DISP}`; g.fillText(d.dd !== null ? `J-${d.dd}` : "TA CAGE", W/2, H*.47);
+  g.font = `700 28px ${BODY}`; g.fillStyle = "rgba(240,240,240,.7)"; spaced(g, d.dd !== null ? `AVANT TA PESÉE  ·  OBJECTIF ${d.goal ? fmt1(d.goal) + " KG" : ""}` : "T'ATTEND", W/2, H*.505, 8, "center");
+  g.font = `600 26px ${BODY}`; g.fillStyle = "rgba(240,240,240,.45)"; spaced(g, `PROCHAIN COMBAT  ·  ${d.sat.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}).toUpperCase()}`, W/2, H*.54, 6, "center");
+  g.textAlign = "left"; footer(g, W, H, d, "rgba(240,240,240,.35)", H*.985);
+  grain(g, W, H, r, 8000, .05);
+}
+// Cage en action : bokeh rouge, combattant éclairé, bande de la cage avec tes infos
+function posterCageAction(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  g.fillStyle = "#070304"; g.fillRect(0,0,W,H);
+  for (let i=0;i<120;i++){ const x = r()*W, y = H*.05 + r()*H*.6, rr = 20 + r()*90, red = r() < .7, b = g.createRadialGradient(x,y,0,x,y,rr);
+    b.addColorStop(0, red ? `rgba(220,40,40,${.12 + r()*.25})` : `rgba(90,140,255,${.15 + r()*.3})`); b.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = b; g.fillRect(x-rr,y-rr,rr*2,rr*2); }
+  g.strokeStyle = "rgba(200,30,30,.45)"; g.lineWidth = 4; for (let i=0;i<14;i++){ const x = i*W/13; g.beginPath(); g.moveTo(x, H*.22); g.lineTo(x + 60, H*.26); g.lineTo(x + 120, H*.22); g.stroke(); }
+  [[W*.15, H*.24, "#6fa8ff"], [W*.62, H*.25, "#6fa8ff"], [W*.85, H*.24, "#ff4040"], [W*.3, H*.31, "#ff4040"]].forEach(([x,y,c])=>{ const gl = g.createRadialGradient(x,y,0,x,y,40); gl.addColorStop(0,"#fff"); gl.addColorStop(.3,c); gl.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle = gl; g.fillRect(x-40,y-40,80,80); });
+  const fh = H*.5, top = H*.3, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "victoire", W*.5, top, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  g.save(); g.shadowColor = "rgba(230,40,40,.6)"; g.shadowBlur = 50; g.drawImage(tint(f, "#1a0b0b"), 0, 0); g.restore();
+  g.save(); g.globalAlpha = .85; g.drawImage(tint(f, "#ff3a32"), -7, -2); g.globalAlpha = .55; g.drawImage(tint(f, "#ffd9c0"), 5, -3); g.restore(); g.drawImage(tint(f, "#160909"), 0, 1);
+  // bande de la cage
+  const by = H*.64, bh = 92;
+  g.fillStyle = "#050505"; g.fillRect(0, by, W, bh); g.fillStyle = "rgba(255,255,255,.08)"; g.fillRect(0, by + 6, W, 10);
+  g.fillStyle = "#1f5fd6"; g.fillRect(W*.58, by + 12, 70, bh - 24); g.fillStyle = "#fff"; g.font = `40px ${DISP}`; g.fillText("FC", W*.58 + 13, by + 64);
+  g.font = `700 40px ${BODY}`; g.fillStyle = "#f2f2f2"; spaced(g, `J-${d.dd ?? "?"}  ·  ${d.goal ? fmt1(d.goal) + " KG" : "DISCIPLINE"}`, 30, by + 62, 4);
+  spaced(g, `${d.first.toUpperCase()}  ${d.W}-${d.L}-${d.D}`, W*.58 + 96, by + 62, 4);
+  meshFill(g, 0, by + bh, W, H, 30, "rgba(30,30,30,.9)", 3);
+  const sh = g.createLinearGradient(0, by + bh, 0, H); sh.addColorStop(0,"rgba(7,3,4,.2)"); sh.addColorStop(1,"rgba(7,3,4,.85)"); g.fillStyle = sh; g.fillRect(0, by + bh, W, H - by - bh);
+  g.textAlign = "center"; g.font = `92px ${DISP}`; g.fillStyle = "#f2e6da"; g.fillText(d.rank === "Champion" ? "ET TOUJOURS" : "LÈVE LES BRAS", W/2, H*.1);
+  g.font = `700 26px ${BODY}`; g.fillStyle = "rgba(242,230,218,.6)"; spaced(g, `XP DE LA SEMAINE  ${fmt0(d.xp)} / ${fmt0(d.opp.target)}`, W/2, H*.135, 6, "center");
+  g.textAlign = "left"; footer(g, W, H, d, "rgba(242,230,218,.45)");
+  grain(g, W, H, r, 9000, .05);
+}
+// Triptyque : trois bandes verticales (départ, aujourd'hui, objectif) sur papier grainé
+async function posterTriptych(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  g.fillStyle = "#d8d2ca"; g.fillRect(0,0,W,H);
+  for (let i=0;i<60000;i++){ const v = r(); g.fillStyle = v < .5 ? `rgba(0,0,0,${r()*.09})` : `rgba(255,255,255,${r()*.18})`; g.fillRect(r()*W, r()*H, 2, 2); }
+  const bands = [[W*.06, H*.24, W*.27, H*.42], [W*.365, H*.28, W*.27, H*.72], [W*.67, H*.26, W*.27, H*.44]];
+  const ph = [...profile.photos].sort((a,b)=>(a.d||"") < (b.d||"") ? -1 : 1);
+  const picks = ph.length >= 3 ? [ph[0], ph[Math.floor(ph.length/2)], ph[ph.length-1]] : ph.length ? [ph[0], ph[ph.length-1], ph[ph.length-1]] : [];
+  const imgs = await Promise.all(picks.map(p=>loadImg(p.url)));
+  const poses = ["garde", "jab", "victoire"];
+  for (let i=0;i<3;i++){ const [x,y,w,h] = bands[i]; g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    const im = imgs[i];
+    if (im){ const s = Math.max(w/im.width, h/im.height); g.filter = "grayscale(35%) contrast(1.1) sepia(25%)"; g.drawImage(im, x + (w - im.width*s)/2, y + (h - im.height*s)/2, im.width*s, im.height*s); g.filter = "none"; }
+    else { const bgc = g.createLinearGradient(x, y, x + w, y + h); bgc.addColorStop(0,"#3a2a22"); bgc.addColorStop(1,"#120c0a"); g.fillStyle = bgc; g.fillRect(x, y, w, h);
+      const fh = H*.62, f = fighterLayer(poses[i], x + w/2, y + h*.04, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"}); g.drawImage(tint(f, "#0e0907"), 0, 0); g.globalAlpha = .6; g.drawImage(tint(f, "#c89470"), i===2 ? -4 : 4, -2); g.globalAlpha = 1; g.drawImage(tint(f, "#140d0a"), i===2 ? 1 : -1, 1); }
+    for (let k=0;k<5000;k++){ g.fillStyle = `rgba(0,0,0,${r()*.12})`; g.fillRect(x + r()*w, y + r()*h, 2, 2); }
+    g.restore(); }
+  const labs = [["DÉPART", profile.startWeight ? fmt1(profile.startWeight) + " KG" : "–"], ["AUJOURD'HUI", d.cw ? fmt1(d.cw) + " KG" : "–"], ["OBJECTIF", d.goal ? fmt1(d.goal) + " KG" : "–"]];
+  labs.forEach(([k,v],i)=>{ const [x,y,w,h] = bands[i], ly = i===1 ? y - 70 : y + h + 60;
+    g.fillStyle = "#1a1412"; g.font = `700 24px ${BODY}`; spaced(g, k, x, ly - 40, 6); g.font = `58px ${DISP}`; g.fillText(v, x, ly + 18); });
+  g.fillStyle = "#1a1412"; g.font = `110px ${DISP}`; g.fillText(d.first.toUpperCase(), W*.06, H*.12);
+  g.font = `700 26px ${BODY}`; g.fillStyle = "rgba(26,20,18,.6)"; spaced(g, `${d.nick ? "« " + d.nick.toUpperCase() + " »  ·  " : ""}JOUR ${d.ed} DU CAMP`, W*.06, H*.15, 6);
+}
+// Bande rouge : chiffre de l'objectif, combattant en clair-obscur, sol brillant
+function posterStripe(g, W, H, o, seed){
+  const d = posterData(), r = rnd(seed);
+  g.fillStyle = "#060606"; g.fillRect(0,0,W,H);
+  const sx = W*.41, sw = W*.19, sg = g.createLinearGradient(0, 0, 0, H); sg.addColorStop(0,"#2a0406"); sg.addColorStop(.4,"#b5121b"); sg.addColorStop(.75,"#6a0a10"); sg.addColorStop(1,"#1a0204");
+  g.fillStyle = sg; g.fillRect(sx, 0, sw, H);
+  const gw = g.createLinearGradient(sx - 120, 0, sx + sw + 120, 0); gw.addColorStop(0,"rgba(181,18,27,0)"); gw.addColorStop(.3,"rgba(181,18,27,.12)"); gw.addColorStop(.7,"rgba(181,18,27,.12)"); gw.addColorStop(1,"rgba(181,18,27,0)"); g.fillStyle = gw; g.fillRect(sx - 120, 0, sw + 240, H);
+  g.fillStyle = "#cfcfcf"; g.font = `600 30px ${BODY}`; spaced(g, "FIGHT CAMP", W/2, H*.3, 34, "center");
+  const goal = d.goal ? fmt1(d.goal) : "--", [a, b] = goal.split(",");
+  g.font = `200px ${DISP}`; const wa = g.measureText(a).width, wb = b ? g.measureText("," + b).width : 0, x0 = W/2 - (wa + wb)/2;
+  g.fillStyle = "#d8d8d8"; g.fillText(a, x0, H*.39); if (b){ g.fillStyle = "#e0262f"; g.fillText("," + b, x0 + wa, H*.39); }
+  g.fillStyle = "#bbb"; g.fillRect(W/2 - 30, H*.415, 60, 3);
+  g.font = `700 26px ${BODY}`; g.fillStyle = "rgba(220,220,220,.7)"; spaced(g, d.dd !== null ? `KG  ·  OBJECTIF  ·  J-${d.dd}` : "KG  ·  OBJECTIF", W/2, H*.45, 10, "center");
+  const floor = H*.9, fh = H*.5, f = fighterLayer(o.fig && POSES[o.fig] ? o.fig : "garde", W*.66, floor - fh, fh, {rim:"rgba(0,0,0,0)", rim2:"rgba(0,0,0,0)"});
+  g.save(); g.globalAlpha = .9; g.drawImage(tint(f, "#ff2a2a"), -6, -1); g.restore(); g.drawImage(tint(f, "#121212"), 0, 0);
+  const sh = document.createElement("canvas"); sh.width = W; sh.height = H; const x = sh.getContext("2d"); x.drawImage(f, 0, 0); x.globalCompositeOperation = "source-in";
+  const lg = x.createLinearGradient(W*.4, 0, W*.9, 0); lg.addColorStop(0,"rgba(80,80,80,.35)"); lg.addColorStop(.5,"rgba(0,0,0,0)"); x.fillStyle = lg; x.fillRect(0,0,W,H); g.drawImage(sh, 0, 0);
+  const rf = document.createElement("canvas"); rf.width = W; rf.height = H; const rx = rf.getContext("2d"); rx.translate(0, floor*2); rx.scale(1, -1); rx.drawImage(tint(f, "#3a0608"), 0, 0); rx.setTransform(1,0,0,1,0,0);
+  rx.globalCompositeOperation = "destination-in"; const mg = rx.createLinearGradient(0, floor, 0, H); mg.addColorStop(0,"rgba(0,0,0,.6)"); mg.addColorStop(1,"rgba(0,0,0,0)"); rx.fillStyle = mg; rx.fillRect(0, floor, W, H - floor);
+  g.save(); g.filter = "blur(4px)"; g.drawImage(rf, 0, 0); g.restore(); g.filter = "none";
+  g.font = `600 24px ${BODY}`; g.fillStyle = "rgba(220,220,220,.55)"; spaced(g, `${d.full.toUpperCase()}  ·  ${d.W}-${d.L}-${d.D}`, 90, H*.955, 6);
+  grain(g, W, H, r, 6000, .04);
+}
+Object.assign(POSTER_STYLES, {arena: posterArena, redcage: posterRedCage, beltglow: posterBeltGlow, emptycage: posterEmptyCage, cageaction: posterCageAction, triptych: posterTriptych, stripe: posterStripe});
+
+const BGS = [["art","Octogone"],["ring","Ring"],["smoke","Fumée"],["poster","Affiche"],["belt","Ceinture"],["minimal","Minimal"],["back","Affiche dos"],["match","Match day"],["grain","Grain"],["white","Blanc"],["arena","Arène"],["redcage","Cage rouge"],["beltglow","Ceinture d'or"],["emptycage","Octogone vide"],["cageaction","Cage en action"],["triptych","Triptyque"],["stripe","Bande rouge"]];
 const FIGS = [["none","Aucun"],["garde","En garde"],["jab","Jab"],["kick","High kick"],["victoire","Victoire"],["champion","Champion"]];
 const MODES = [["quote","Citation"],["word","Mot fort"],["goal","Objectif"],["count","Compte à rebours"],["tape","Fiche du combattant"]];
 function fitLines(g, text, maxW, maxLines, size, min, fam){
@@ -2727,7 +2914,17 @@ const PRESETS = () => [
   ["Match day · Jab",{mode:"quote",bg:"match",fig:"jab"}],
   ["Grain",{mode:"quote",bg:"grain",fig:"none"}],
   ["Blanc · Objectif",{mode:"goal",bg:"white",fig:"garde"}],
-  ["Blanc · High kick",{mode:"count",bg:"white",fig:"kick"}]
+  ["Blanc · High kick",{mode:"count",bg:"white",fig:"kick"}],
+  ["Arène",{mode:"quote",bg:"arena",fig:"garde"}],
+  ["Cage rouge",{mode:"count",bg:"redcage",fig:"garde"}],
+  ["Cage rouge · Victoire",{mode:"count",bg:"redcage",fig:"victoire"}],
+  ["Ceinture d'or",{mode:"quote",bg:"beltglow",fig:"champion"}],
+  ["Octogone vide",{mode:"count",bg:"emptycage",fig:"none"}],
+  ["Cage en action",{mode:"quote",bg:"cageaction",fig:"victoire"}],
+  ["Cage · High kick",{mode:"quote",bg:"cageaction",fig:"kick"}],
+  ["Triptyque",{mode:"tape",bg:"triptych",fig:"none"}],
+  ["Bande rouge",{mode:"goal",bg:"stripe",fig:"garde"}],
+  ["Bande rouge · Jab",{mode:"goal",bg:"stripe",fig:"jab"}]
 ].map(([nom,o],i)=>({id:"p"+i, nom, o:Object.assign({seed:11+i*7}, o)}));
 async function buildThumbs(){
   if (wall.thumbsBusy) return; wall.thumbsBusy = true;
@@ -2749,7 +2946,9 @@ function dailyTemplate(dk){
     {mode:"quote", bg:"smoke", fig:"kick"}, {mode:"word", bg:"belt", fig:"none"}, {mode:"quote", bg:"art", fig:"champion"},
     {mode:"goal", bg:"smoke", fig:"garde"}, {mode:"quote", bg:"ring", fig:"none"}, {mode:"count", bg:"art", fig:"none"},
     {mode:"quote", bg:"poster", fig:"victoire"}, {mode:"tape", bg:"poster", fig:"none"}, {mode:"quote", bg:"minimal", fig:"none"},
-    {mode:"quote", bg:"back", fig:"garde"}, {mode:"quote", bg:"match", fig:"garde"}, {mode:"quote", bg:"grain", fig:"none"}, {mode:"goal", bg:"white", fig:"garde"}
+    {mode:"quote", bg:"back", fig:"garde"}, {mode:"quote", bg:"match", fig:"garde"}, {mode:"quote", bg:"grain", fig:"none"}, {mode:"goal", bg:"white", fig:"garde"},
+    {mode:"quote", bg:"arena", fig:"garde"}, {mode:"count", bg:"redcage", fig:"garde"}, {mode:"quote", bg:"beltglow", fig:"champion"}, {mode:"count", bg:"emptycage", fig:"none"},
+    {mode:"quote", bg:"cageaction", fig:"victoire"}, {mode:"tape", bg:"triptych", fig:"none"}, {mode:"goal", bg:"stripe", fig:"garde"}
   ];
   return Object.assign({qi, word: n % WORDS.length, seed: n}, T[(hasPh ? Math.floor(n/2) : n) % T.length]);
 }
